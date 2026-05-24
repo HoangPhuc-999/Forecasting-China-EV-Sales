@@ -1,2 +1,2 @@
-# Forecasting-China-EV-Market-Share
-Forecasting China’s electric vehicle market share using SARIMA
+# Forecasting-China-EV-Sales
+Forecasting China’s electric vehicle sales using SARIMA
