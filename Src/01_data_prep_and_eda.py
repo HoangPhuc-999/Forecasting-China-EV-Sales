@@ -51,6 +51,7 @@ def main() -> None:
     print("Negative units_sold:", (df_raw["units_sold"] < 0).sum())
 
     _ = df_raw["units_sold"].describe()
+    _ = df_raw["is_ev"].value_counts()
 
     plt.figure(figsize=(10, 5))
     sns.histplot(df_raw["units_sold"], bins=100, kde=True, color="teal")
@@ -74,6 +75,34 @@ def main() -> None:
     monthly = monthly.asfreq("MS")
     monthly["EV_Sales"] = monthly["EV_Sales"].fillna(0)
     monthly["Total_Sales"] = monthly["Total_Sales"].fillna(0)
+
+    # Compare additive vs. multiplicative decomposition on the positive series
+    series_pos = monthly["EV_Sales"].replace(0, np.nan).dropna()
+    add_decomp = seasonal_decompose(series_pos, model="additive", period=12)
+    mul_decomp = seasonal_decompose(series_pos, model="multiplicative", period=12)
+
+    comparison_table = pd.DataFrame(
+        {
+            "additive_resid_std": [add_decomp.resid.dropna().std()],
+            "multiplicative_resid_std": [mul_decomp.resid.dropna().std()],
+            "additive_resid_mean": [add_decomp.resid.dropna().mean()],
+            "multiplicative_resid_mean": [mul_decomp.resid.dropna().mean()],
+        }
+    )
+
+    fig, axes = plt.subplots(2, 2, figsize=(12, 6), sharex=True)
+    axes[0, 0].plot(add_decomp.trend, color="#1f77b4")
+    axes[0, 0].set_title("Additive Trend")
+    axes[0, 1].plot(mul_decomp.trend, color="#ff7f0e")
+    axes[0, 1].set_title("Multiplicative Trend")
+    axes[1, 0].plot(add_decomp.resid, color="#1f77b4")
+    axes[1, 0].set_title("Additive Residuals")
+    axes[1, 1].plot(mul_decomp.resid, color="#ff7f0e")
+    axes[1, 1].set_title("Multiplicative Residuals")
+
+    plt.tight_layout()
+    save_fig("02_additive_vs_multiplicative_decomposition.png")
+    plt.show()
 
     fig, ax = plt.subplots(figsize=(10, 4))
     ax.plot(monthly.index, monthly["EV_Sales"], color="#1f77b4")

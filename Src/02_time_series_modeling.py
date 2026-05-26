@@ -15,7 +15,7 @@ from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
 from statsmodels.stats.diagnostic import acorr_ljungbox
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
 from statsmodels.tsa.statespace.sarimax import SARIMAX
-from statsmodels.tsa.stattools import adfuller
+from statsmodels.tsa.stattools import adfuller, kpss
 
 
 plt.style.use("seaborn-v0_8")
@@ -109,19 +109,119 @@ def main() -> None:
     )
     print(combo_table)
 
+    adf_rows: list[dict[str, object]] = []
+    series_specs = [
+        ("Raw data", 0, 0),
+        ("Differenced data", 1, 1),
+    ]
+
+    for label, d_val, D_val in series_specs:
+        srs = y.copy()
+        if d_val > 0:
+            srs = srs.diff(d_val)
+        if D_val > 0:
+            srs = srs.diff(seasonal_period)
+        srs = srs.dropna()
+
+        res = adfuller(srs, autolag="AIC")
+        crit = res[4]
+
+        adf_rows.append(
+            {
+                "series": label,
+                "d": d_val,
+                "D": D_val,
+                "adf_statistic": float(res[0]),
+                "p_value": float(res[1]),
+                "critical_value_1%": float(crit["1%"]),
+                "critical_value_5%": float(crit["5%"]),
+                "critical_value_10%": float(crit["10%"]),
+            }
+        )
+
+    adf_compare_table = pd.DataFrame(adf_rows).round(4)
+    print(adf_compare_table)
+
+    kpss_rows: list[dict[str, object]] = []
+    for label, d_val, D_val in series_specs:
+        srs = y.copy()
+        if d_val > 0:
+            srs = srs.diff(d_val)
+        if D_val > 0:
+            srs = srs.diff(seasonal_period)
+        srs = srs.dropna()
+
+        stat, pval, lags, crit = kpss(srs, regression="c", nlags="auto")
+        kpss_rows.append(
+            {
+                "series": label,
+                "d": d_val,
+                "D": D_val,
+                "kpss_statistic": float(stat),
+                "p_value": float(pval),
+                "critical_value_10%": float(crit["10%"]),
+                "critical_value_5%": float(crit["5%"]),
+                "critical_value_2.5%": float(crit["2.5%"]),
+                "critical_value_1%": float(crit["1%"]),
+                "conclusion_5%": "stationary" if pval > 0.05 else "non-stationary",
+            }
+        )
+
+    kpss_table = pd.DataFrame(kpss_rows).round(4)
+    print(kpss_table)
+
+    # Detailed ADF table with test statistic and critical values (1%, 5%, 10%)
+    adf_rows: list[dict[str, object]] = []
+    for _, r in combo_table.iterrows():
+        d_val = int(r["d"])
+        D_val = int(r["D"])
+        base = y.diff(d_val) if d_val > 0 else y.copy()
+        series = base.diff(seasonal_period) if D_val > 0 else base
+        series = series.dropna()
+        if len(series) < 12:
+            continue
+        res = adfuller(series, autolag="AIC")
+        test_stat = float(res[0])
+        pval = float(res[1])
+        usedlag = int(res[2])
+        nobs_adf = int(res[3])
+        crit = res[4]
+        adf_rows.append(
+            {
+                "d": d_val,
+                "D": D_val,
+                "usedlag": usedlag,
+                "nobs": nobs_adf,
+                "test_stat": test_stat,
+                "pvalue": pval,
+                "cv_1%": float(crit.get("1%")),
+                "cv_5%": float(crit.get("5%")),
+                "cv_10%": float(crit.get("10%")),
+            }
+        )
+
+    if adf_rows:
+        adf_table = (
+            pd.DataFrame(adf_rows)
+            .sort_values(["pvalue", "d", "D"]) 
+            .reset_index(drop=True)
+        )
+        print("\nADF detailed table (test statistic, p-value, critical values):")
+        print(adf_table.round(4))
+
     # ACF/PACF after chosen differencing
     d_choice = 1
-    d_seasonal_choice = 1
+    D_choice = 1
     y_diff = y.diff(d_choice) if d_choice > 0 else y.copy()
-    if d_seasonal_choice > 0:
+    if D_choice > 0:
         y_diff = y_diff.diff(seasonal_period)
     y_diff = y_diff.dropna()
 
     fig, axes = plt.subplots(1, 2, figsize=(12, 4))
     plot_acf(y_diff, ax=axes[0], lags=24)
     plot_pacf(y_diff, ax=axes[1], lags=24, method="ywm")
-    axes[0].set_title(f"ACF (d={d_choice}, D={d_seasonal_choice})")
-    axes[1].set_title(f"PACF (d={d_choice}, D={d_seasonal_choice})")
+    axes[0].set_title(f"ACF (d={d_choice}, D={D_choice})")
+    axes[1].set_title(f"PACF (d={d_choice}, D={D_choice})")
     plt.tight_layout()
     save_fig("02_acf_pacf_diff.png")
     plt.show()
@@ -133,8 +233,8 @@ def main() -> None:
     d_used = 1
     d_seasonal_used = 1
 
-    # Auto-ARIMA
-    model = auto_arima(
+    # Fit the best auto_arima candidate and show the ranked top fits
+    fit_results = auto_arima(
         train,
         seasonal=True,
         m=s,
@@ -151,23 +251,35 @@ def main() -> None:
         suppress_warnings=True,
         method="lbfgs",
         maxiter=2000,
+        return_valid_fits=True,
     )
 
-    summary_table = (
-        pd.DataFrame(
-            [
-                {
-                    "s": s,
-                    "order": model.order,
-                    "seasonal_order": model.seasonal_order,
-                    "aic": model.aic(),
-                    "bic": model.bic(),
-                }
-            ]
+    if isinstance(fit_results, tuple):
+        valid_fits = list(fit_results)
+        model = valid_fits[0]
+    else:
+        model = fit_results
+        valid_fits = [model]
+
+    summary_rows = []
+    for fitted in valid_fits:
+        summary_rows.append(
+            {
+                "s": s,
+                "order": fitted.order,
+                "seasonal_order": fitted.seasonal_order,
+                "aic": fitted.aic(),
+                "bic": fitted.bic(),
+            }
         )
-        .sort_values(["aic", "bic"])
+
+    summary_table = (
+        pd.DataFrame(summary_rows)
+        .sort_values(["bic", "aic"])
+        .head(3)
         .reset_index(drop=True)
     )
+    summary_table.insert(0, "rank", np.arange(1, len(summary_table) + 1))
     print(summary_table)
 
     # Rolling CV
@@ -318,8 +430,13 @@ def main() -> None:
         }
     ]
 
-    pred_test_sales_nested = sarima_nested_model.get_forecast(steps=n_test).predicted_mean
+    forecast_res = sarima_nested_model.get_forecast(steps=n_test)
+    pred_test_sales_nested = forecast_res.predicted_mean
     pred_test_sales_nested.index = test.index
+    ci_test = forecast_res.conf_int(alpha=0.05)
+    ci_test.index = test.index
+    lower_95 = ci_test.iloc[:, 0]
+    upper_95 = ci_test.iloc[:, 1]
     rmse, mape = compute_metrics(actual_test_sales, pred_test_sales_nested)
     metrics.append(
         {
@@ -354,9 +471,22 @@ def main() -> None:
         linewidth=2.0,
     )
 
+    ax.fill_between(
+        test.index,
+        lower_95,
+        upper_95,
+        color="#E63946",
+        alpha=0.2,
+        label="95% CI",
+    )
+
+    from matplotlib.ticker import StrMethodFormatter
+
     ax.set_title("Test Set Forecast - Nested SARIMA", fontsize=13)
     ax.set_ylabel("Units Sold")
     ax.set_xlabel("Month")
+    ax.ticklabel_format(style="plain", axis="y")
+    ax.yaxis.set_major_formatter(StrMethodFormatter("{x:,.0f}"))
     ax.legend(loc="upper left")
 
     plt.tight_layout()
@@ -367,6 +497,182 @@ def main() -> None:
 
     # Log vs no-log comparison
     actual_test_sales = monthly["EV_Sales"].loc[test.index]
+
+    # Log-space ADF and nested-CV SARIMA for the multiplicative-style model
+    y_log = np.log1p(monthly["EV_Sales"].astype(float))
+
+    adf_log_rows = [
+        {"series": "level", "pvalue": adf_pvalue(y_log)},
+        {"series": "diff1", "pvalue": adf_pvalue(y_log.diff(1))},
+        {"series": "seasonal_diff12", "pvalue": adf_pvalue(y_log.diff(12))},
+        {
+            "series": "diff1_seasonal_diff12",
+            "pvalue": adf_pvalue(y_log.diff(1).diff(12)),
+        },
+    ]
+    adf_log_table = pd.DataFrame(adf_log_rows)
+
+    combo_log_rows = []
+    for d_try in [0, 1, 2]:
+        base = y_log.diff(d_try) if d_try > 0 else y_log.copy()
+        for D_try in [0, 1]:
+            series = base.diff(seasonal_period) if D_try > 0 else base
+            series = series.dropna()
+            if len(series) < 12:
+                continue
+            combo_log_rows.append(
+                {
+                    "d": d_try,
+                    "D": D_try,
+                    "pvalue": adf_pvalue(series),
+                    "nobs": len(series),
+                }
+            )
+
+    combo_log_table = (
+        pd.DataFrame(combo_log_rows)
+        .sort_values(["pvalue", "d", "D"])
+        .reset_index(drop=True)
+    )
+
+    best_combo_log = combo_log_table.iloc[0]
+    d_used_log = int(best_combo_log["d"])
+    D_used_log = int(best_combo_log["D"])
+
+    train_log = y_log.loc[train.index]
+    test_log = y_log.loc[test.index]
+
+    cv_nested_log = RollingForecastCV(
+        h=1,
+        step=1,
+        initial=max(24, int(len(train_log) * 0.7)),
+    )
+
+    nested_rows_log: list[dict[str, object]] = []
+    for fold, (train_idx, test_idx) in enumerate(cv_nested_log.split(train_log), start=1):
+        y_train = train_log.iloc[train_idx]
+        y_test = train_log.iloc[test_idx]
+
+        fold_model = auto_arima(
+            y_train,
+            seasonal=True,
+            m=s,
+            d=d_used_log,
+            D=D_used_log,
+            max_p=2,
+            max_q=2,
+            max_P=1,
+            max_Q=1,
+            information_criterion="bic",
+            stepwise=True,
+            trace=False,
+            error_action="ignore",
+            suppress_warnings=True,
+            method="lbfgs",
+            maxiter=2000,
+        )
+
+        y_pred = fold_model.predict(n_periods=len(y_test))
+        rmse = float(np.sqrt(mean_squared_error(y_test, y_pred)))
+        mape = float(np.mean(np.abs((y_test - y_pred) / y_test.replace(0, np.nan))) * 100)
+
+        nested_rows_log.append(
+            {
+                "fold": fold,
+                "order": fold_model.order,
+                "seasonal_order": fold_model.seasonal_order,
+                "rmse": rmse,
+                "mape": mape,
+            }
+        )
+
+    nested_table_log = pd.DataFrame(nested_rows_log)
+    nested_summary_log = (
+        nested_table_log.groupby(["order", "seasonal_order"], as_index=False)
+        .agg(mean_rmse=("rmse", "mean"), mean_mape=("mape", "mean"), n_folds=("fold", "count"))
+        .sort_values(["mean_rmse", "mean_mape"])
+        .reset_index(drop=True)
+    )
+
+    best_row_log = nested_summary_log.iloc[0]
+    best_order_log = best_row_log["order"]
+    best_seasonal_order_log = best_row_log["seasonal_order"]
+
+    log_model_nested = SARIMAX(
+        train_log,
+        order=best_order_log,
+        seasonal_order=best_seasonal_order_log,
+        enforce_stationarity=False,
+        enforce_invertibility=False,
+    ).fit(disp=False, maxiter=2000)
+
+    pred_test_log_nested = log_model_nested.get_forecast(steps=len(test)).predicted_mean
+    pred_test_log_nested.index = test.index
+    pred_test_log_sales_nested = np.expm1(pred_test_log_nested)
+
+    actual_test_sales = monthly["EV_Sales"].loc[test.index]
+    rmse_log_nested = float(
+        np.sqrt(mean_squared_error(actual_test_sales, pred_test_log_sales_nested))
+    )
+    mape_log_nested = float(
+        np.mean(
+            np.abs((actual_test_sales - pred_test_log_sales_nested) / actual_test_sales.replace(0, np.nan))
+        )
+        * 100
+    )
+
+    metrics_table_log = pd.DataFrame(
+        [
+            {
+                "transform": "log1p",
+                "d": d_used_log,
+                "D": D_used_log,
+                "order": best_order_log,
+                "seasonal_order": best_seasonal_order_log,
+                "rmse_test": rmse_log_nested,
+                "mape_test": mape_log_nested,
+            }
+        ]
+    )
+
+    fig, ax = plt.subplots(figsize=(10, 4))
+
+    ax.plot(
+        test.index,
+        actual_test_sales,
+        label="Actual (Test)",
+        color="#1f77b4",
+        linewidth=2.5,
+        zorder=10,
+    )
+
+    ax.plot(
+        test.index,
+        pred_test_log_sales_nested,
+        label="SARIMA log1p (nested CV)",
+        color="#E63946",
+        linewidth=2.0,
+    )
+
+    from matplotlib.ticker import StrMethodFormatter
+
+    ax.set_title("Test Set Forecast - Log-Space SARIMA (Nested CV)", fontsize=13)
+    ax.set_ylabel("Units Sold")
+    ax.set_xlabel("Month")
+    ax.ticklabel_format(style="plain", axis="y")
+    ax.yaxis.set_major_formatter(StrMethodFormatter("{x:,.0f}"))
+    ax.legend(loc="upper left")
+
+    plt.tight_layout()
+    plt.show()
+
+    print("ADF-guided differencing for log-space model:")
+    print(adf_log_table)
+    print("Joint differencing candidates:")
+    print(combo_log_table)
+    print(f"Selected d={d_used_log}, D={D_used_log}")
+
+    _ = metrics_table_log
 
     pred_test_sales_auto = pd.Series(model.predict(n_periods=n_test), index=test.index)
     rmse_raw_auto, mape_raw_auto = compute_metrics(actual_test_sales, pred_test_sales_auto)
