@@ -534,40 +534,6 @@ These forecasts have practical relevance for manufacturers, distributors, policy
 
 Future work should extend this framework in three directions. First, incorporating exogenous policy variables -- such as subsidy amounts, purchase restriction policies, and the charging infrastructure density metric highlighted by \citet{yang2024} -- via SARIMAX would reduce the model's vulnerability to policy shocks. Second, disaggregating the forecast by BEV versus PHEV segment, or by major OEM, would provide more actionable granularity for industry decision-makers, building on the factor-level decomposition of \citet{ge2024}. Third, the model should be updated on a rolling basis as new monthly observations become available, with automated anomaly detection to flag structural breaks early -- a natural extension toward the type of adaptive forecasting demonstrated by \citet{lu2024} in the UK context.
 
-%% ─────────────────────────────────────────────────────────────────────────────
-%% APPENDICES
-%% ─────────────────────────────────────────────────────────────────────────────
-\appendix
-
-\section{Appendix}
-
-\subsection{Implementation Details}
-\label{app:code}
-
-The entire pipeline was implemented in Python 3.11 using the following libraries: \texttt{pandas} for data loading and monthly aggregation; \texttt{numpy} for numerical operations; \texttt{matplotlib} and \texttt{seaborn} for visualization; \texttt{statsmodels} for SARIMAX estimation, ADF, KPSS, and Ljung-Box testing; \texttt{pmdarima} for auto-ARIMA and rolling cross-validation; \texttt{prophet} for the Facebook Prophet baseline; and \texttt{tensorflow/keras} for the LSTM baseline. The code is organized into two notebooks: \texttt{01\_Data\_Prep\_and\_EDA.ipynb} (preprocessing, decomposition, outlier analysis) and \texttt{02\_Time\_Series\_Modeling.ipynb} (stationarity tests, model selection, diagnostics, forecast comparison). All random seeds are fixed at 42 for reproducibility.
-
-\subsection{SARIMA Algorithm Outline}
-\label{app:algorithm}
-
-\noindent\textbf{Input:} Monthly EV sales series $\{y_t\}_{t=1}^{T}$, seasonal period $m=12$.
-
-\noindent\textbf{Step 1 --- Data Preprocessing:} Remove duplicates; convert \texttt{units\_sold} to integer; filter EV records; aggregate to monthly start frequency; fill missing months with zero.
-
-\noindent\textbf{Step 2 --- Exploratory Analysis:} Plot raw series, compute summary statistics, perform additive decomposition to inspect trend, seasonal, and residual components. Apply 3-sigma outlier check on residuals.
-
-\noindent\textbf{Step 3 --- Stationarity:} Run ADF and KPSS on raw series and differenced variants. Select $(d,D)=(1,1)$ based on dual test confirmation.
-
-\noindent\textbf{Step 4 --- Initial Model Search (Stage 1):} Run auto-ARIMA with $p,q \le 2$, $P,Q \le 1$, $d=1$, $D=1$, $s=12$, BIC criterion, stepwise search. Record top-3 candidates by BIC.
-
-\noindent\textbf{Step 5 --- Nested Rolling CV (Stage 2):} For each fold in a rolling expanding window, re-fit auto-ARIMA and record one-step-ahead RMSE. Aggregate mean RMSE across folds per order configuration. Select the order with lowest mean RMSE.
-
-\noindent\textbf{Step 6 --- Residual Diagnostics:} Inspect residual ACF, histogram, Q-Q plot, and Ljung-Box $Q(12)$ statistic.
-
-\noindent\textbf{Step 7 --- Baseline Comparison:} Fit ARIMA, Holt-Winters, Prophet, and LSTM on the same training split. Evaluate all models on the 12-month test set.
-
-\noindent\textbf{Step 8 --- Final Forecast:} Refit selected SARIMA on all $T$ observations. Generate $h=12$ step-ahead forecasts with 95\% confidence intervals.
-
-\noindent\textbf{Output:} SARIMA parameter estimates, test-set RMSE/MAPE, residual test $p$-values, and the 12-month forecast table.
 
 %% ─────────────────────────────────────────────────────────────────────────────
 %% REFERENCES
@@ -607,5 +573,41 @@ in \textit{Proceedings of the 8th International Conference on Economic Managemen
 \textbf{Felixzhao} (2024) \textit{China Automobile Monthly Sales Data (2018--2024.4)}. Available at: \url{https://www.kaggle.com/datasets/felixzhao/china-automobile-monthly-sales-data-2018-2024-4} (Accessed: May 2026).
 
 \end{thebibliography}
+
+%% ─────────────────────────────────────────────────────────────────────────────
+%% APPENDICES
+%% ─────────────────────────────────────────────────────────────────────────────
+\newpage
+\appendix
+
+\section{Appendix}
+
+\subsection{Implementation Details}
+\label{app:code}
+
+The entire pipeline was implemented in Python 3.11 using the following libraries: \texttt{pandas} for data loading and monthly aggregation; \texttt{numpy} for numerical operations; \texttt{matplotlib} and \texttt{seaborn} for visualization; \texttt{statsmodels} for SARIMAX estimation, ADF, KPSS, and Ljung-Box testing; \texttt{pmdarima} for auto-ARIMA and rolling cross-validation; \texttt{prophet} for the Facebook Prophet baseline; and \texttt{tensorflow/keras} for the LSTM baseline. The code is organized into two notebooks: \texttt{01\_Data\_Prep\_and\_EDA.ipynb} (preprocessing, decomposition, outlier analysis) and \texttt{02\_Time\_Series\_Modeling.ipynb} (stationarity tests, model selection, diagnostics, forecast comparison). All random seeds are fixed at 42 for reproducibility.
+
+\subsection{SARIMA Algorithm Outline}
+\label{app:algorithm}
+
+\noindent\textbf{Input:} Monthly EV sales series $\{y_t\}_{t=1}^{T}$, seasonal period $m=12$.
+
+\noindent\textbf{Step 1 --- Data Preprocessing:} Remove duplicates; convert \texttt{units\_sold} to integer; filter EV records; aggregate to monthly start frequency; fill missing months with zero.
+
+\noindent\textbf{Step 2 --- Exploratory Analysis:} Plot raw series, compute summary statistics, perform additive decomposition to inspect trend, seasonal, and residual components. Apply 3-sigma outlier check on residuals.
+
+\noindent\textbf{Step 3 --- Stationarity:} Run ADF and KPSS on raw series and differenced variants. Select $(d,D)=(1,1)$ based on dual test confirmation.
+
+\noindent\textbf{Step 4 --- Initial Model Search (Stage 1):} Run auto-ARIMA with $p,q \le 2$, $P,Q \le 1$, $d=1$, $D=1$, $s=12$, BIC criterion, stepwise search. Record top-3 candidates by BIC.
+
+\noindent\textbf{Step 5 --- Nested Rolling CV (Stage 2):} For each fold in a rolling expanding window, re-fit auto-ARIMA and record one-step-ahead RMSE. Aggregate mean RMSE across folds per order configuration. Select the order with lowest mean RMSE.
+
+\noindent\textbf{Step 6 --- Residual Diagnostics:} Inspect residual ACF, histogram, Q-Q plot, and Ljung-Box $Q(12)$ statistic.
+
+\noindent\textbf{Step 7 --- Baseline Comparison:} Fit ARIMA, Holt-Winters, Prophet, and LSTM on the same training split. Evaluate all models on the 12-month test set.
+
+\noindent\textbf{Step 8 --- Final Forecast:} Refit selected SARIMA on all $T$ observations. Generate $h=12$ step-ahead forecasts with 95\% confidence intervals.
+
+\noindent\textbf{Output:} SARIMA parameter estimates, test-set RMSE/MAPE, residual test $p$-values, and the 12-month forecast table.
 
 \end{document}
