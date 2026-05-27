@@ -268,7 +268,8 @@ To contextualize the SARIMA performance, four baseline models are estimated on t
 \item \textbf{LSTM:} A simple one-layer LSTM with 32 hidden units, MinMax normalization, and lookback windows of 6, 12, and 24 months; the best configuration is reported. The LSTM baseline is included to evaluate whether a data-hungry deep learning architecture offers advantages over classical methods at this sample size, consistent with the comparative analysis recommended by \citet{cetin2024}.
 \end{itemize}
 
-\subsection{Robustness Check: Additive vs.\ Multiplicative (Log-Space)}
+\subsection{Robustness Check: Additive vs. Multiplicative and Log vs.
+No-log Specification}
 
 To verify that the additive specification is preferable to a multiplicative alternative, we replicate the full nested-CV pipeline on $\log(1 + y_t)$ and back-transform forecasts to the original scale for comparison. A lower test RMSE under the no-log specification confirms the additive choice.
 
