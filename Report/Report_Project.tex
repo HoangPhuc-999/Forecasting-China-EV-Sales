@@ -23,10 +23,9 @@
 \usepackage{microtype}
 \usepackage{natbib}
 
-\title{\textbf{Modeling and Forecasting China's Electric Vehicle Sales\\
-Using a Seasonally-Optimized SARIMA Model}}
+\title{\textbf{Modeling and Forecasting China's Electric Vehicle Sales Using Optimized SARIMA Model}}
 
-\author{Ngo Hoang Phuc \\[4pt]
+\author{Ngo Hoang Phuc \\
 National Economics University \\
 \texttt{11230582@st.neu.edu.vn}}
 
@@ -38,43 +37,14 @@ National Economics University \\
 
 \begin{abstract}
 \noindent
-This paper develops a Seasonal Autoregressive Integrated Moving Average (SARIMA) framework
-to model and forecast monthly electric vehicle (EV) sales in China from January 2018 to
-April 2024 (76 observations). The dataset is constructed from the China Automobile Sales
-Data (Kaggle) by filtering EV records and aggregating to monthly totals. After thorough
-preprocessing, exploratory analysis, and decomposition, we confirm that the series
-exhibits a strong long-term upward trend, pronounced 12-month seasonality, and
-non-constant variance driven by rapid market growth. Stationarity is verified jointly
-using the Augmented Dickey-Fuller (ADF) and KPSS tests, which indicate that
-first-order non-seasonal differencing ($d=1$) combined with one seasonal difference
-($D=1, s=12$) renders the series fully stationary.
-
-Model selection proceeds in two stages: an initial stepwise auto-ARIMA search guided
-by the Bayesian Information Criterion (BIC), followed by a nested rolling
-cross-validation procedure that selects the final specification
-SARIMA$(1,1,0)\times(1,1,0)_{12}$ based on minimum out-of-sample RMSE across multiple
-time folds. On a held-out 12-month test window (May 2023 to April 2024), the model
-achieves RMSE~$=108{,}191$ units and MAPE~$=17.42\%$, with Ljung-Box residual test
-$p=0.336$, confirming white-noise residuals. SARIMA outperforms a non-seasonal ARIMA
-and a simple LSTM, and is competitive with Holt-Winters and Prophet. Robustness checks
-confirm that modeling the original series without log transformation yields lower errors
-than a multiplicative log-space specification.
-
-The 12-month forward forecast (May 2024--April 2025) indicates continued growth, with
-sales peaking around December 2024 at approximately 810,000 units, followed by an
-early-year dip to roughly 446,000 units in February 2025 due to the Lunar New Year
-holiday effect. These projections provide actionable guidance for production planning,
-inventory management, supply chain coordination, and public charging infrastructure
-deployment.
+This paper develops a Seasonal Autoregressive Integrated Moving Average (SARIMA) framework to forecast monthly electric vehicle (EV) sales in China using data from January 2018 to April 2024. After preprocessing and exploratory analysis, the series is found to exhibit a strong upward trend, clear 12-month seasonality, and non-constant variance. Stationarity tests (ADF and KPSS) indicate that first-order and seasonal differencing are sufficient to achieve stationarity. Model selection combines auto-ARIMA and nested rolling cross-validation, resulting in a final SARIMA$(1,1,0)\times(1,1,0)_{12}$ specification. On a 12-month test set, the model achieves RMSE~$=108{,}191$ and MAPE~$=17.42\%$, while residual diagnostics confirm white-noise errors. The proposed SARIMA model outperforms non-seasonal ARIMA and LSTM models, and remains competitive with Holt-Winters and Prophet. Forecasts for May 2024 to April 2025 suggest continued growth in China’s EV market, with sales expected to peak near 810,000 units in December 2024 before declining temporarily during the Lunar New Year period. The results provide practical insights for production planning, inventory management, and EV infrastructure development.
 \end{abstract}
 
 \vspace{0.3cm}
 \noindent \textbf{Keywords:} Time Series Analysis, SARIMA Model, Electric Vehicles,
-Demand Forecasting, Seasonality, China NEV Market.\\
-\noindent \textbf{JEL Classification:} C22, Q47, L62.
+Demand Forecasting, Seasonality, China EV Market.\\
+\noindent \textbf{JEL Classification:} C22, L62, Q47.
 
-\newpage
-\tableofcontents
 \newpage
 
 %% ─────────────────────────────────────────────────────────────────────────────
@@ -82,136 +52,49 @@ Demand Forecasting, Seasonality, China NEV Market.\\
 \label{sec:intro}
 %% ─────────────────────────────────────────────────────────────────────────────
 
-The electric vehicle market has become one of the most strategically important segments
-of the global automotive industry. Driven by a convergence of environmental policy,
-technological advancement, and shifting consumer preferences, global EV sales have grown
-exponentially over the past decade. China occupies the commanding position in this
-expansion: it is simultaneously the world's largest producer and largest consumer of
-new energy vehicles (NEVs), accounting for more than half of global EV sales annually.
-As of December 2023, monthly EV sales in China reached approximately 756,000 units---a
-figure that was unimaginable only six years earlier, when monthly sales stood below
-25,000 units in early 2018.
+The electric vehicle market has become one of the most strategically important segments of the global automotive industry. Driven by a convergence of environmental policy, technological advancement, and shifting consumer preferences, global EV sales have grown exponentially over the past decade. China occupies the commanding position in this expansion: it is simultaneously the world's largest producer and largest consumer of electric vehicles, accounting for more than half of global EV sales annually. As of December 2023, monthly EV sales in China reached approximately 756,000 units -- a figure that was unimaginable only six years earlier, when monthly sales stood below 25,000 units in early 2018.
 
-This extraordinary growth trajectory creates both an opportunity and a challenge for
-forecasters. The market is not merely expanding---it is doing so with pronounced
-seasonality, episodic policy-driven shocks, and structural breaks that complicate
-standard time series models. Understanding and anticipating these dynamics is critical
-for a wide range of stakeholders. Automotive manufacturers must plan production
-schedules and allocate battery procurement well in advance of demand peaks.
-Distributors and retailers need to build inventory buffers aligned with predictable
-seasonal cycles. Policymakers responsible for charging infrastructure deployment require
-reliable forward-looking demand estimates to site and scale public charging networks.
-Financial investors and analysts need forecasts to calibrate valuation models and
-assess market saturation risk.
+This extraordinary growth trajectory creates both an opportunity and a challenge for forecasters. The market is not merely expanding -- it is doing so with pronounced seasonality, episodic policy-driven shocks, and structural breaks that complicate standard time series models. Understanding and anticipating these dynamics is critical
+for a wide range of stakeholders. Automotive manufacturers must plan production schedules and allocate battery procurement well in advance of demand peaks. Distributors and retailers need to build inventory buffers aligned with predictable seasonal cycles. Policymakers responsible for charging infrastructure deployment require reliable forward-looking demand estimates to site and scale public charging networks. Financial investors and analysts need forecasts to calibrate valuation models and assess market saturation risk.
 
-Despite the practical importance of accurate EV sales forecasting in China, the
-existing academic literature is still relatively thin on this specific topic,
-particularly with respect to transparent, reproducible methodologies grounded in
-rigorous statistical testing. Several recent studies have applied SARIMA-family models
-to EV sales in China and the United States with promising results, but they differ in
-their data coverage, model selection strategies, and validation approaches
-\citep{chen2025, cetin2024}. This paper seeks to fill part of that gap by providing a
-complete, end-to-end SARIMA forecasting workflow applied to a long-horizon China EV
-panel.
+Despite the practical importance of accurate EV sales forecasting in China, the existing academic literature is still relatively thin on this specific topic, particularly with respect to transparent, reproducible methodologies grounded in rigorous statistical testing. Several recent studies have applied SARIMA-family models to EV sales in China and the United States with promising results, but they differ in their data coverage, model selection strategies, and validation approaches \citep{chen2025, cetin2024}. This paper seeks to fill part of that gap by providing a complete, end-to-end SARIMA forecasting workflow applied to a long-horizon China EV panel.
 
-The specific contributions of this paper are threefold. First, it constructs a clean,
-monthly China EV sales series spanning January 2018 to April 2024 by aggregating
-vehicle-level transaction records, documenting all preprocessing steps for
-reproducibility. Second, it implements a disciplined two-stage model selection
-procedure that combines auto-ARIMA with nested rolling cross-validation
-(rolling CV)---a more robust alternative to single-split evaluation. Third, it provides
-a systematic benchmark comparison against Holt-Winters, Prophet, non-seasonal ARIMA,
-and a simple LSTM, and discusses the economic interpretability of the chosen model's
-forecasts in the context of China's NEV market dynamics.
+The specific contributions of this paper are threefold. First, it constructs a clean, monthly China EV sales series spanning January 2018 to April 2024 by aggregating vehicle-level transaction records, documenting all preprocessing steps for reproducibility. Second, it implements a disciplined two-stage model selection procedure that combines auto-ARIMA with nested rolling cross-validation (rolling CV) -- a more robust alternative to single-split evaluation. Third, it provides a systematic benchmark comparison against Holt-Winters, Prophet, non-seasonal ARIMA, and a simple LSTM, and discusses the economic interpretability of the chosen model's forecasts in the context of China's EV market dynamics.
 
-The remainder of the paper is organized as follows. Section~\ref{sec:lit} reviews
-relevant prior literature. Section~\ref{sec:data} describes the data and preprocessing
-steps, including exploratory analysis and decomposition. Section~\ref{sec:methods}
-presents the econometric framework, including the SARIMA model specification, stationarity
-testing, and the nested CV selection strategy.
-Section~\ref{sec:results} reports empirical results covering stationarity tests, model
-selection, residual diagnostics, forecast accuracy, and a comparative assessment against
-baseline models. Section~\ref{sec:discussion} discusses the economic implications,
-robustness, and limitations of the results. Section~\ref{sec:conclusion} concludes.
+The remainder of the paper is organized as follows. Section~\ref{sec:lit} reviews relevant prior literature. Section~\ref{sec:data} describes the data and preprocessing steps, including exploratory analysis and decomposition. Section~\ref{sec:methods} presents the econometric framework, including the SARIMA model specification, stationarity testing, and the nested CV selection strategy. Section~\ref{sec:results} reports empirical results covering stationarity tests, model selection, residual diagnostics, forecast accuracy, and a comparative assessment against baseline models. Section~\ref{sec:discussion} discusses the economic implications, robustness, and limitations of the results. Section~\ref{sec:conclusion} concludes.
 
 %% ─────────────────────────────────────────────────────────────────────────────
 \section{Literature Review}
 \label{sec:lit}
 %% ─────────────────────────────────────────────────────────────────────────────
 
-Forecasting automobile sales is a long-standing topic in applied econometrics, drawing
-on methods ranging from structural demand models to reduced-form time series techniques.
-Within the electric vehicle literature, forecasting research has grown substantially
-since around 2020, motivated by the dramatic acceleration of market adoption and its
-policy implications.
+Forecasting automobile sales is a long-standing topic in applied econometrics, drawing on methods ranging from structural demand models to reduced-form time series techniques. Within the electric vehicle literature, forecasting research has grown substantially since around 2020, motivated by the dramatic acceleration of market adoption and its policy implications.
 
 \subsection{Seasonal Time Series Modeling for Demand Forecasting}
 
-The ARIMA family of models, first systematized by Box and Jenkins, remains a
-foundational approach for univariate time series with trend and autocorrelation
-structure \citep{cetin2024}. For series exhibiting periodic seasonal cycles, the
-Seasonal ARIMA (SARIMA) extension adds seasonal AR, differencing, and MA terms,
-enabling the model to capture recurring within-year patterns simultaneously with
-non-seasonal dynamics. This property makes SARIMA particularly attractive for monthly
-automotive sales data, where strong intra-year variation driven by holidays, promotions,
-and policy cycles is well-documented.
+The ARIMA family of models, first systematized by Box and Jenkins, remains a foundational approach for univariate time series with trend and autocorrelation structure \citep{cetin2024}. For series exhibiting periodic seasonal cycles, the Seasonal ARIMA (SARIMA) extension adds seasonal AR, differencing, and MA terms, enabling the model to capture recurring within-year patterns simultaneously with
+non-seasonal dynamics. This property makes SARIMA particularly attractive for monthly automotive sales data, where strong intra-year variation driven by holidays, promotions, and policy cycles is well-documented.
 
-The comparative evidence on SARIMA's performance relative to more flexible machine
-learning alternatives is nuanced. \citet{cetin2024} summarize a cross-domain literature
-including studies on electricity load, rainfall, unemployment, retail demand, and
-passenger traffic. Their review finds that SARIMA and hybrid SARIMA-GARCH models
-consistently achieve high accuracy for data governed by seasonal patterns, while deep
-learning approaches such as LSTM and ANN tend to outperform only in settings with
-abundant high-frequency data. For monthly series with fewer than 100 observations---the
-regime applicable to this paper---statistical parsimony favors SARIMA.
+The comparative evidence on SARIMA's performance relative to more flexible machine learning alternatives is nuanced. \citet{cetin2024} summarize a cross-domain literature including studies on electricity load, rainfall, unemployment, retail demand, and passenger traffic. Their review finds that SARIMA and hybrid SARIMA-GARCH models
+consistently achieve high accuracy for data governed by seasonal patterns, while deep learning approaches such as LSTM and ANN tend to outperform only in settings with abundant high-frequency data. For monthly series with fewer than 100 observations -- the regime applicable to this paper -- statistical parsimony favors SARIMA.
 
 \subsection{EV Sales Forecasting in China and the United States}
 
-\citet{chen2025} apply a SARIMA framework specifically to monthly new energy vehicle
-(NEV) sales in China from January 2022 to April 2024. Their study documents strong
-seasonality, with fourth-quarter peaks attributable to year-end promotions and
-policy-induced buying acceleration. They demonstrate that SARIMA outperforms
-Holt-Winters for this particular dataset and argue that the model's transparency is
-valuable for downstream applications such as charging infrastructure planning. One
-important finding is that policy events---particularly subsidy changes---generate abrupt
-demand shifts that univariate models struggle to anticipate, motivating extensions to
-SARIMAX with exogenous policy variables.
+\citet{chen2025} apply a SARIMA framework specifically to monthly new energy vehicle (NEV) sales in China from January 2022 to April 2024. Their study documents strong seasonality, with fourth-quarter peaks attributable to year-end promotions and policy-induced buying acceleration. They demonstrate that SARIMA outperforms Holt-Winters for this particular dataset and argue that the model's transparency is
+valuable for downstream applications such as charging infrastructure planning. One important finding is that policy events -- particularly subsidy changes -- generate abrupt demand shifts that univariate models struggle to anticipate, motivating extensions to SARIMAX with exogenous policy variables.
 
-\citet{cetin2024} forecast monthly US light-duty EV sales for 2024--2025 using an
-optimized SARIMA model selected via grid search over AIC, BIC, and HQIC criteria.
-Their preferred specification, SARIMA$(1,0,2)\times(1,0,1)_{12}$, predicts a
-consistent upward trend in US EV adoption, with seasonal peaks in summer months
-(June--July) reflecting stronger warm-weather consumer activity. These results
-stand in contrast to China's pattern, where peaks typically concentrate in Q4
-under year-end promotional and subsidy dynamics---a market-structure difference that
-motivates country-specific modeling.
+\citet{cetin2024} forecast monthly US light-duty EV sales for 2024--2025 using an optimized SARIMA model selected via grid search over AIC, BIC, and HQIC criteria. Their preferred specification, SARIMA$(1,0,2)\times(1,0,1)_{12}$, predicts a consistent upward trend in US EV adoption, with seasonal peaks in summer months (June--July) reflecting stronger warm-weather consumer activity. These results
+stand in contrast to China's pattern, where peaks typically concentrate in Q4 under year-end promotional and subsidy dynamics -- a market-structure difference that motivates country-specific modeling.
 
 \subsection{Alternative Forecasting Methods}
 
-Beyond SARIMA, several alternative approaches have been applied in related contexts.
-The Holt-Winters exponential smoothing (ETS) model adds level, trend, and seasonal
-smoothing components and is computationally simpler but lacks the ACF/PACF-based
-structural interpretation of SARIMA \citep{cetin2024}. Prophet, developed at Facebook,
-uses an additive regression model with trend changepoints and Fourier-series seasonality;
-it can be powerful for series with multiple seasonal layers or irregular trends but has
-been shown to underperform SARIMA on short monthly series without complex multi-frequency
-patterns \citep{cetin2024}. LSTM neural networks offer flexibility for high-frequency
-data but are data-hungry, and several studies confirm they cannot reliably outperform
-classical methods on monthly panels with fewer than 100 observations.
+Beyond SARIMA, several alternative approaches have been applied in related contexts. The Holt-Winters exponential smoothing (ETS) model adds level, trend, and seasonal smoothing components and is computationally simpler but lacks the ACF/PACF-based structural interpretation of SARIMA \citep{cetin2024}. Prophet, developed at Facebook, uses an additive regression model with trend changepoints and Fourier-series seasonality; it can be powerful for series with multiple seasonal layers or irregular trends but has been shown to underperform SARIMA on short monthly series without complex multi-frequency patterns \citep{cetin2024}. LSTM neural networks offer flexibility for high-frequency data but are data-hungry, and several studies confirm they cannot reliably outperform classical methods on monthly panels with fewer than 100 observations.
 
 \subsection{Gap Addressed by This Paper}
 
-The literature has three notable gaps that this paper addresses. First, existing
-China-focused EV forecasting studies use either short data windows (2022--2024) or
-aggregate data that smooth over micro-level heterogeneity; this paper uses a longer
-series from 2018 that captures multiple market phases. Second, most studies rely on
-a single hold-out split for evaluation, which may yield unreliable performance
-estimates when the test period coincides with a market shock; this paper instead uses
-nested rolling CV. Third, explicit model robustness checks---such as
-comparing additive versus multiplicative specifications---are rarely conducted in the EV
-forecasting literature, yet are important for choosing the correct model family.
-Table~\ref{tab:lit} summarizes selected related studies and highlights the positioning
-of this work.
+The literature has three notable gaps that this paper addresses. First, existing China-focused EV forecasting studies use either short data windows (2022--2024) or aggregate data that smooth over micro-level heterogeneity; this paper uses a longer series from 2018 that captures multiple market phases. Second, most studies rely on
+a single hold-out split for evaluation, which may yield unreliable performance estimates when the test period coincides with a market shock; this paper instead uses nested rolling CV. Third, explicit model robustness checks -- such as comparing additive versus multiplicative specifications -- are rarely conducted in the EV
+forecasting literature, yet are important for choosing the correct model family. Table~\ref{tab:lit} summarizes selected related studies and highlights the positioning of this work.
 
 \begin{table}[H]
 \centering
@@ -237,31 +120,14 @@ This paper & SARIMA (nested CV) & China EV, 2018--2024 & Longer panel; robust ne
 
 \subsection{Data Source}
 
-The primary data source is the China Automobile Monthly Sales Data (2018--2024.4)
-made available on Kaggle by Felixzhao \citep{felixzhao2024}. The raw dataset contains
-38,806 vehicle-model-month observations covering a broad range of passenger vehicle
-models sold in China, with fields including \texttt{year\_month}, \texttt{units\_sold},
-\texttt{brand}, \texttt{model}, and \texttt{is\_ev}, where the last indicator
-distinguishes electric vehicles from internal combustion engine (ICE) models. The data
-are compiled from official sales registration records reported by the China Passenger Car
-Association (CPCA) and partner market research firms, ensuring coverage of national
-market transactions.
+The primary data source is the China Automobile Monthly Sales Data (2018--2024.4) made available on Kaggle by Felixzhao \citep{felixzhao2024}. The raw dataset contains 38,806 vehicle-model-month observations covering a broad range of passenger vehicle models sold in China, with fields including \texttt{year\_month}, \texttt{units\_sold}, \texttt{brand}, \texttt{model}, and \texttt{is\_ev}, where the last indicator distinguishes electric vehicles from internal combustion engine (ICE) models. The data are compiled from official sales registration records reported by the China Passenger Car Association (CPCA) and partner market research firms, ensuring coverage of national market transactions.
 
 \subsection{Data Preprocessing}
 
-The preprocessing pipeline proceeds in five steps. First, \textit{deduplication}: a
-review identified 33 fully duplicated rows, which were removed to prevent double-counting
-in the monthly aggregation. Second, \textit{type conversion}: the \texttt{units\_sold}
-field was stored as a string with comma separators; these were stripped and the field
-converted to integer. No negative or non-numeric values remained after conversion.
-Third, \textit{EV filtering}: only rows where \texttt{is\_ev == ``EV''} were retained.
-Fourth, \textit{monthly aggregation}: EV unit counts were summed within each calendar
-month, yielding a monthly total-sales series indexed by month-start dates. Fifth,
-\textit{frequency alignment}: the index was set to a regular monthly start (\texttt{MS})
-frequency, and any missing months were filled with zero (no missing months were found
-in practice). The resulting processed series is exported to
-\texttt{ev\_sales\_monthly.csv} and covers January 2018 to April 2024, for a total of
-$T = 76$ observations.
+The preprocessing pipeline proceeds in five steps. First, \textit{deduplication}: a review identified 33 fully duplicated rows, which were removed to prevent double-counting in the monthly aggregation. Second, \textit{type conversion}: the \texttt{units\_sold}
+field was stored as a string with comma separators; these were stripped and the field converted to integer. No negative or non-numeric values remained after conversion. Third, \textit{EV filtering}: only rows where \texttt{is\_ev == ``EV''} were retained.
+Fourth, \textit{monthly aggregation}: EV unit counts were summed within each calendar month, yielding a monthly total-sales series indexed by month-start dates. Fifth, \textit{frequency alignment}: the index was set to a regular monthly start (\texttt{MS}) frequency, and any missing months were filled with zero (no missing months were found
+in practice). The resulting processed series is exported to \texttt{ev\_sales\_monthly.csv} and covers January 2018 to April 2024, for a total of $T = 76$ observations.
 
 Formally, the monthly EV sales series is defined as:
 \begin{equation}
@@ -285,90 +151,52 @@ Observations & 76 \\
 Mean & 255,718 \\
 Standard deviation & 214,734 \\
 Minimum & 8,988 (Feb 2020) \\
-25th percentile & 68,143 \\
-Median & 168,863 \\
-75th percentile & 425,222 \\
+25th percentile & 71,195 \\
+Median & 165,863 \\
+75th percentile & 471,338 \\
 Maximum & 755,943 (Dec 2023) \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The statistics underscore the series' exceptional dynamism. The coefficient of
-variation exceeds 80\%, reflecting not merely noise but a fundamental structural
-expansion of the market from fewer than 25,000 units per month in early 2018 to
-almost 756,000 units in December 2023---a 30-fold increase in six years.
+The statistics underscore the series' exceptional dynamism. The coefficient of variation exceeds 80\%, reflecting not merely noise but a fundamental structural expansion of the market from fewer than 25,000 units per month in early 2018 to almost 756,000 units in December 2023 -- a 30-fold increase in six years.
 
 \subsection{Visual Inspection and Trend Analysis}
 
-The raw time series (Figure~\ref{fig:series}) reveals three distinct growth phases.
-The first phase (2018--2020) exhibits modest, low-level growth punctuated by a
-severe trough in February 2020 (8,988 units), which corresponds to the national
-COVID-19 lockdowns that halted automotive production and retail activity. The second
-phase (2021--2022) represents explosive market acceleration: monthly sales surged
-from roughly 97,000 units in February 2021 to over 651,000 units in December 2022.
-This acceleration was powered by aggressive government purchase subsidies, rapid
-expansion of the charging network, and the entry of new domestic OEM brands
-(notably BYD's dramatic commercial rise). The third phase (2023--2024) is
-characterized by continued growth at a more moderate, stabilizing rate following the
-complete phase-out of national EV purchase subsidies on December 31, 2022.
+The raw time series (Figure~\ref{fig:series}) reveals three distinct growth phases. The first phase (2018--2020) exhibits modest, low-level growth punctuated by a severe trough in February 2020 (8,988 units), which corresponds to the national COVID-19 lockdowns that halted automotive production and retail activity. The second phase (2021--2022) represents explosive market acceleration: monthly sales surged
+from roughly 97,000 units in February 2021 to over 651,000 units in December 2022. This acceleration was powered by aggressive government purchase subsidies, rapid expansion of the charging network, and the entry of new domestic OEM brands (notably BYD's dramatic commercial rise). The third phase (2023--2024) is characterized by continued growth at a more moderate, stabilizing rate following the complete phase-out of national EV purchase subsidies on December 31, 2022.
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.92\textwidth]{figures/02_ev_sales_monthly.png}
-\caption{Monthly EV sales in China, January 2018 to April 2024. The sharp trough
-in February 2020 reflects COVID-19 lockdowns; the sharp dip in January 2023
-reflects the ``post-subsidy hangover'' following the expiry of national EV
-subsidies on 31 December 2022.}
+\caption{Monthly EV sales in China, January 2018 to April 2024. The sharp trough in February 2020 reflects COVID-19 lockdowns; the sharp dip in January 2023 reflects the ``post-subsidy hangover'' following the expiry of national EV subsidies on 31 December 2022.}
 \label{fig:series}
 \end{figure}
 
 \subsection{Seasonal Decomposition}
 
-To separate the structural components of the series, we apply additive seasonal
-decomposition with a 12-month period. The decomposition reveals:
+To separate the structural components of the series, we apply additive seasonal decomposition with a 12-month period. The decomposition reveals:
 
 \begin{enumerate}
-\item \textbf{Trend:} A smooth, accelerating upward trend from 2018 through 2022,
-followed by a leveling off in 2023--2024 as the market matures and the subsidy
-environment normalizes.
+\item \textbf{Trend:} A smooth, accelerating upward trend from 2018 through 2022, followed by a leveling off in 2023--2024 as the market matures and the subsidy environment normalizes.
 
-\item \textbf{Seasonality:} A stable 12-month seasonal pattern with consistent
-within-year amplitude, ranging from approximately $-$75,000 units (February trough)
-to $+$75,000 units (November--December peak). The January--February dip is attributable
-to the Lunar New Year holiday effect, which suppresses consumer activity and disrupts
-manufacturing. The late-year surge reflects year-end promotions, fleet purchases, and
-historically, the rush to capitalize on expiring subsidies.
+\item \textbf{Seasonality:} A stable 12-month seasonal pattern with consistent within-year amplitude, ranging from approximately $-$75,000 units (February trough) to $+$75,000 units (November--December peak). The January--February dip is attributable to the Lunar New Year holiday effect, which suppresses consumer activity and disrupts
+manufacturing. The late-year surge reflects year-end promotions, fleet purchases, and historically, the rush to capitalize on expiring subsidies.
 
-\item \textbf{Residuals:} Residuals are well-behaved from 2018 through most of 2022.
-A large negative outlier emerges in January 2023 (approximately $-$175,000 units
-relative to the trend-seasonal component), corresponding to the post-subsidy
-demand collapse. A 3-sigma outlier test confirms this as the single statistically
-anomalous observation in the sample.
+\item \textbf{Residuals:} Residuals are well-behaved from 2018 through most of 2022. A large negative outlier emerges in January 2023 (approximately $-$175,000 units relative to the trend-seasonal component), corresponding to the post-subsidy demand collapse. A 3-sigma outlier test confirms this as the single statistically anomalous observation in the sample.
 \end{enumerate}
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.92\textwidth]{figures/04_seasonal_decompose.png}
-\caption{Additive seasonal decomposition of monthly EV sales: observed series (top),
-trend component (second), seasonal component (third), and residuals (bottom).
-The seasonal component shows a stable 12-month cycle; the residuals reveal a
-large negative shock in January 2023.}
+\caption{Additive seasonal decomposition of monthly EV sales: observed series (top), trend component (second), seasonal component (third), and residuals (bottom). The seasonal component shows a stable 12-month cycle; the residuals reveal a large negative shock in January 2023.}
 \label{fig:decomp}
 \end{figure}
 
-We also compare additive and multiplicative decomposition models. The multiplicative
-residuals have a mean closer to 1.0 (ideal) on the training data, suggesting
-multiplicative seasonal structure. However, as demonstrated in Section~\ref{sec:robust},
-modeling the series directly in levels under an additive SARIMA specification
-outperforms a log-space (multiplicative) SARIMA on the out-of-sample test window.
-This apparent contradiction is explained by the structural break in 2023: the
-multiplicative specification amplifies the early-period growth trajectory and
-over-extrapolates after the market shift, while the additive model---being more
-conservative---adapts more gracefully to the deceleration phase.
+We also compare additive and multiplicative decomposition models. The multiplicative residuals have a mean closer to 1.0 (ideal) on the training data, suggesting multiplicative seasonal structure. However, as demonstrated in Section~\ref{sec:robust}, modeling the series directly in levels under an additive SARIMA specification outperforms a log-space (multiplicative) SARIMA on the out-of-sample test window.
+This apparent contradiction is explained by the structural break in 2023: the multiplicative specification amplifies the early-period growth trajectory and over-extrapolates after the market shift, while the additive model -- being more conservative -- adapts more gracefully to the deceleration phase.
 
-The January 2023 outlier is retained without adjustment. It reflects a genuine
-policy-driven demand shock rather than a measurement error, and removing it would
-discard economically meaningful information about structural market dynamics.
+The January 2023 outlier is retained without adjustment. It reflects a genuine policy-driven demand shock rather than a measurement error, and removing it would discard economically meaningful information about structural market dynamics.
 
 %% ─────────────────────────────────────────────────────────────────────────────
 \section{Methodology}
@@ -377,80 +205,47 @@ discard economically meaningful information about structural market dynamics.
 
 \subsection{The SARIMA Model}
 
-The Seasonal Autoregressive Integrated Moving Average (SARIMA) model generalizes
-the Box-Jenkins ARIMA framework to accommodate periodic seasonality. The general
-SARIMA$(p,d,q)\times(P,D,Q)_{s}$ model is:
+The Seasonal Autoregressive Integrated Moving Average (SARIMA) model generalizes the Box-Jenkins ARIMA framework to accommodate periodic seasonality. The general SARIMA$(p,d,q)\times(P,D,Q)_{s}$ model is:
 \begin{equation}
 \Phi_{P}(B^{s})\,\phi_{p}(B)\,\nabla_{s}^{D}\nabla^{d}\,x_{t}
 = \Theta_{Q}(B^{s})\,\theta_{q}(B)\,w_{t},
 \label{eq:sarima}
 \end{equation}
-where $B$ is the backshift operator ($Bx_t = x_{t-1}$), $\nabla^d = (1-B)^d$ is
-the non-seasonal difference operator, $\nabla_s^D = (1-B^s)^D$ is the seasonal
-difference operator, $\phi_p(B) = 1 - \phi_1 B - \cdots - \phi_p B^p$ and
-$\theta_q(B) = 1 + \theta_1 B + \cdots + \theta_q B^q$ are the non-seasonal AR and
-MA polynomials, $\Phi_P(B^s)$ and $\Theta_Q(B^s)$ are their seasonal counterparts at
-lag $s$, and $w_t \sim \text{WN}(0, \sigma^2)$ is a white noise innovation process
-\citep{cetin2024}.
+where $B$ is the backshift operator ($Bx_t = x_{t-1}$), $\nabla^d = (1-B)^d$ is the non-seasonal difference operator, $\nabla_s^D = (1-B^s)^D$ is the seasonal difference operator, $\phi_p(B) = 1 - \phi_1 B - \cdots - \phi_p B^p$ and $\theta_q(B) = 1 + \theta_1 B + \cdots + \theta_q B^q$ are the non-seasonal AR and MA polynomials, $\Phi_P(B^s)$ and $\Theta_Q(B^s)$ are their seasonal counterparts at
+lag $s$, and $w_t \sim \text{WN}(0, \sigma^2)$ is a white noise innovation process \citep{cetin2024}.
 
-The non-seasonal parameters $(p, d, q)$ govern short-term autocorrelation structure
-after trend removal, while the seasonal parameters $(P, D, Q)$ govern year-over-year
-dynamics at period $s = 12$ months. For China EV sales, the 12-month period is
-economically motivated by the annual promotional cycle, the Lunar New Year effect,
+The non-seasonal parameters $(p, d, q)$ govern short-term autocorrelation structure after trend removal, while the seasonal parameters $(P, D, Q)$ govern year-over-year dynamics at period $s = 12$ months. For China EV sales, the 12-month period is economically motivated by the annual promotional cycle, the Lunar New Year effect,
 and policy announcement calendars.
 
 \subsection{Stationarity Testing}
 
-Consistent parameter estimation in ARIMA-family models requires stationarity of the
-transformed series. We conduct a dual testing strategy using:
+Consistent parameter estimation in ARIMA-family models requires stationarity of the transformed series. We conduct a dual testing strategy using:
 
 \begin{itemize}
-\item \textbf{Augmented Dickey-Fuller (ADF) test:} Null hypothesis is a unit root
-(non-stationarity). Rejection ($p < 0.05$) supports stationarity.
+\item \textbf{Augmented Dickey-Fuller (ADF) test:} Null hypothesis is a unit root (non-stationarity). Rejection ($p < 0.05$) supports stationarity.
 \item \textbf{KPSS test:} Null hypothesis is stationarity. Failure to reject
 ($p > 0.05$) supports stationarity.
 \end{itemize}
 
-Using both tests in conjunction reduces the risk of a false conclusion. An ideal
-outcome is simultaneous ADF rejection and KPSS non-rejection \citep{cetin2024}.
+Using both tests in conjunction reduces the risk of a false conclusion. An ideal outcome is simultaneous ADF rejection and KPSS non-rejection \citep{cetin2024}.
 
-We evaluate differencing combinations $(d, D) \in \{0,1,2\} \times \{0,1\}$ and
-select the minimum transformation that achieves confirmed stationarity. The seasonal
-period is fixed at $s = 12$ throughout.
+We evaluate differencing combinations $(d, D) \in \{0,1,2\} \times \{0,1\}$ and select the minimum transformation that achieves confirmed stationarity. The seasonal period is fixed at $s = 12$ throughout.
 
 \subsection{Model Selection: Auto-ARIMA and Nested Rolling Cross-Validation}
 
-Model selection follows a two-stage procedure designed to balance fit quality with
-generalization:
+Model selection follows a two-stage procedure designed to balance fit quality with generalization:
 
-\textbf{Stage 1 --- Auto-ARIMA (BIC-guided):} An initial stepwise search over
-$(p, q) \in \{0,1,2\}^2$ and $(P,Q) \in \{0,1\}^2$ is conducted using the
-\texttt{pmdarima} library with the differencing orders fixed at $(d,D)=(1,1)$ and
-seasonal period $s=12$. The Bayesian Information Criterion (BIC) is used as the
-selection criterion because it penalizes model complexity more heavily than AIC,
-reducing the risk of over-parameterization in a sample of only 64 training
-observations.
+\textbf{Stage 1 --- Auto-ARIMA (BIC-guided):} An initial stepwise search over $(p, q) \in \{0,1,2\}^2$ and $(P,Q) \in \{0,1\}^2$ is conducted using the \texttt{pmdarima} library with the differencing orders fixed at $(d,D)=(1,1)$ and seasonal period $s=12$. The Bayesian Information Criterion (BIC) is used as the selection criterion because it penalizes model complexity more heavily than AIC, reducing the risk of over-parameterization in a sample of only 64 training observations.
 
-\textbf{Stage 2 --- Nested Rolling Cross-Validation:} The auto-ARIMA output provides
-an initial candidate set. To obtain a robust out-of-sample evaluation, we apply nested
-rolling cross-validation (nested CV): for each rolling fold (expanding window with
-step size 1 and horizon 1), a fresh auto-ARIMA is fitted on the fold's training data,
-and the one-step forecast is compared to the held-out observation. The configuration
-that achieves the lowest mean RMSE across all folds is selected as the final model.
+\textbf{Stage 2 --- Nested Rolling Cross-Validation:} The auto-ARIMA output provides an initial candidate set. To obtain a robust out-of-sample evaluation, we apply nested rolling cross-validation (nested CV): for each rolling fold (expanding window with step size 1 and horizon 1), a fresh auto-ARIMA is fitted on the fold's training data,
+and the one-step forecast is compared to the held-out observation. The configuration that achieves the lowest mean RMSE across all folds is selected as the final model.
 
-This nested CV approach is motivated by the literature on temporal cross-validation,
-which shows that a single hold-out split can yield misleading performance estimates
-when the data exhibit structural breaks \citep{cetin2024}. In the presence of the
-January 2023 policy shock, the nested CV is particularly valuable because it evaluates
+This nested CV approach is motivated by the literature on temporal cross-validation, which shows that a single hold-out split can yield misleading performance estimates when the data exhibit structural breaks \citep{cetin2024}. In the presence of the January 2023 policy shock, the nested CV is particularly valuable because it evaluates
 the model's robustness across different historical windows.
 
 \subsection{Train-Test Split and Final Evaluation}
 
-The 76-observation series is split into a training set of 64 months (January 2018
-to April 2023) and a test set of 12 months (May 2023 to April 2024). This 64/12 split
-places the test window in the post-subsidy market regime, providing a demanding
-out-of-sample evaluation that tests whether the model can generalize to a structural
-environment different from the training period.
+The 76-observation series is split into a training set of 64 months (January 2018 to April 2023) and a test set of 12 months (May 2023 to April 2024). This 64/12 split places the test window in the post-subsidy market regime, providing a demanding out-of-sample evaluation that tests whether the model can generalize to a structural environment different from the training period.
 
 Forecast accuracy on the test window is measured by:
 \begin{equation}
@@ -463,39 +258,27 @@ Residual independence is assessed using the Ljung-Box $Q$-statistic at lag $h = 
 \begin{equation}
 Q(12) = n(n+2)\sum_{j=1}^{12}\frac{\hat{\rho}_j^2}{n-j},
 \end{equation}
-where $\hat{\rho}_j$ is the sample autocorrelation of residuals at lag $j$. Under
-the null hypothesis of white-noise residuals, $Q(12) \sim \chi^2(12)$.
+where $\hat{\rho}_j$ is the sample autocorrelation of residuals at lag $j$. Under the null hypothesis of white-noise residuals, $Q(12) \sim \chi^2(12)$.
 
 \subsection{Baseline Models}
 
-To contextualize the SARIMA performance, four baseline models are estimated on the
-same training set and evaluated on the same test split:
+To contextualize the SARIMA performance, four baseline models are estimated on the same training set and evaluated on the same test split:
 
 \begin{itemize}
 \item \textbf{Non-seasonal ARIMA:} auto-ARIMA with \texttt{seasonal=False},
 capturing only trend dynamics.
-\item \textbf{Holt-Winters (ETS):} Additive trend and additive seasonal smoothing
-with 12-month seasonal period.
-\item \textbf{Prophet:} Facebook's additive regression model with Fourier-series
-annual seasonality.
-\item \textbf{LSTM:} A simple one-layer LSTM with 32 hidden units, MinMax
-normalization, and lookback windows of 6, 12, and 24 months; the best configuration
-is reported.
+\item \textbf{Holt-Winters (ETS):} Additive trend and additive seasonal smoothing with 12-month seasonal period.
+\item \textbf{Prophet:} Facebook's additive regression model with Fourier-series annual seasonality.
+\item \textbf{LSTM:} A simple one-layer LSTM with 32 hidden units, MinMax normalization, and lookback windows of 6, 12, and 24 months; the best configuration is reported.
 \end{itemize}
 
 \subsection{Robustness Check: Additive vs.\ Multiplicative (Log-Space)}
 
-To verify that the additive specification is preferable to a multiplicative
-alternative, we replicate the full nested-CV pipeline on $\log(1 + y_t)$ and
-back-transform forecasts to the original scale for comparison. A lower test RMSE
-under the no-log specification confirms the additive choice.
+To verify that the additive specification is preferable to a multiplicative alternative, we replicate the full nested-CV pipeline on $\log(1 + y_t)$ and back-transform forecasts to the original scale for comparison. A lower test RMSE under the no-log specification confirms the additive choice.
 
 \subsection{Final Forecast}
 
-After validation, the model is re-estimated on the full 76-observation series and
-used to generate a 12-month forward forecast (May 2024 to April 2025) with 95\%
-confidence intervals. The confidence interval width reflects the variance of the
-innovation process and widens with the forecast horizon in the standard manner.
+After validation, the model is re-estimated on the full 76-observation series and used to generate a 12-month forward forecast (May 2024 to April 2025) with 95\% confidence intervals. The confidence interval width reflects the variance of the innovation process and widens with the forecast horizon in the standard manner.
 
 %% ─────────────────────────────────────────────────────────────────────────────
 \section{Results}
@@ -504,42 +287,27 @@ innovation process and widens with the forecast horizon in the standard manner.
 
 \subsection{ACF and PACF Analysis}
 
-Figure~\ref{fig:acf_levels} shows the ACF and PACF of the raw EV sales series.
-The ACF decays very slowly and almost linearly across 24 lags, with all coefficients
-far outside the 95\% confidence band. The PACF shows a single dominant spike at
-lag 1 (close to 1.0), followed by rapid decay. This pattern is the canonical
-signature of a strongly non-stationary series with a persistent trend component
-\citep{cetin2024}.
+Figure~\ref{fig:acf_levels} shows the ACF and PACF of the raw EV sales series. The ACF decays very slowly and almost linearly across 24 lags, with all coefficients far outside the 95\% confidence band. The PACF shows a single dominant spike at lag 1 (close to 1.0), followed by rapid decay. This pattern is the canonical signature of a strongly non-stationary series with a persistent trend component \citep{cetin2024}.
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.92\textwidth]{figures/05_acf_pacf_raw.png}
-\caption{ACF (left) and PACF (right) of monthly EV sales in levels. The slowly
-decaying ACF confirms non-stationarity; the dominant PACF spike at lag 1 is
-consistent with a near-unit-root process.}
+\caption{ACF (left) and PACF (right) of monthly EV sales in levels. The slowly decaying ACF confirms non-stationarity; the dominant PACF spike at lag 1 is consistent with a near-unit-root process.}
 \label{fig:acf_levels}
 \end{figure}
 
-After applying combined non-seasonal and seasonal differencing $(d=1, D=1, s=12)$,
-the transformed series shows dramatically improved behavior (Figure~\ref{fig:acf_diff}).
-The ACF exhibits a sharp negative spike at lag 1 and then drops within the confidence
-band, while the PACF shows a similar pattern. This structure is consistent with a
-low-order ARMA process, confirming that the chosen differencing is sufficient and
-appropriate.
+After applying combined non-seasonal and seasonal differencing $(d=1, D=1, s=12)$, the transformed series shows dramatically improved behavior (Figure~\ref{fig:acf_diff}). The ACF exhibits a sharp negative spike at lag 1 and then drops within the confidence band, while the PACF shows a similar pattern. This structure is consistent with a low-order ARMA process, confirming that the chosen differencing is sufficient and appropriate.
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.92\textwidth]{figures/06_acf_pacf_diff.png}
-\caption{ACF (left) and PACF (right) after differencing $(d=1, D=1, s=12)$.
-The series is now effectively stationary, with residual autocorrelations
-largely within the 95\% confidence band.}
+\caption{ACF (left) and PACF (right) after differencing $(d=1, D=1, s=12)$. The series is now effectively stationary, with residual autocorrelations largely within the 95\% confidence band.}
 \label{fig:acf_diff}
 \end{figure}
 
 \subsection{Stationarity Tests}
 
-Table~\ref{tab:stationarity} reports the ADF and KPSS test results for the raw and
-differenced series.
+Table~\ref{tab:stationarity} reports the ADF and KPSS test results for the raw and differenced series.
 
 \begin{table}[H]
 \centering
@@ -550,31 +318,17 @@ differenced series.
 Series & $(d, D)$ & ADF stat. & ADF $p$-value
 & KPSS stat. & KPSS $p$-value \\
 \midrule
-Raw data & $(0, 0)$ & $-1.012$ & $0.9579$ & $1.2073$ & $0.010$ \\
+Raw data & $(0, 0)$ & $-0.0077$ & $0.9579$ & $1.2073$ & $0.010$ \\
 Differenced & $(1, 1)$ & $-12.375$ & $\approx 0$ & $0.1284$ & $0.100$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The raw series fails both stationarity criteria: the ADF $p$-value of 0.9579 cannot
-reject the unit root null, and the KPSS statistic of 1.2073 far exceeds the 5\%
-critical value of 0.463, strongly rejecting the stationarity null. After applying
-$(d=1, D=1)$ differencing, both tests confirm stationarity with high confidence:
-the ADF statistic of $-12.375$ is well below the 1\% critical value ($-3.449$),
-and the KPSS statistic of 0.1284 falls safely below the 10\% critical value (0.347),
-so the stationarity null is not rejected. This dual confirmation---ADF rejection and
-KPSS non-rejection---is the gold standard for stationarity verification
-\citep{cetin2024}. We therefore fix $d=1$ and $D=1$ for all subsequent SARIMA
-estimation.
+The raw series fails both stationarity criteria: the ADF $p$-value of 0.9579 cannot reject the unit root null, and the KPSS statistic of 1.2073 far exceeds the 5\% critical value of 0.463, strongly rejecting the stationarity null. After applying $(d=1, D=1)$ differencing, both tests confirm stationarity with high confidence: the ADF statistic of $-12.375$ is well below the 1\% critical value ($-3.5405$), and the KPSS statistic of 0.1284 falls safely below the 10\% critical value (0.347), so the stationarity null is not rejected. This dual confirmation -- ADF rejection and KPSS non-rejection -- is the gold standard for stationarity verification \citep{cetin2024}. We therefore fix $d=1$ and $D=1$ for all subsequent SARIMA estimation.
 
 \subsection{Model Selection and the Final Specification}
 
-\textbf{Stage 1 --- Auto-ARIMA (BIC):} The stepwise auto-ARIMA search over the
-constrained parameter grid ($p, q \le 2$; $P, Q \le 1$; $d=1$; $D=1$; $s=12$)
-identifies SARIMA$(2,1,2)\times(1,1,1)_{12}$ as the BIC-optimal specification on
-the 64-month training set, with BIC = 910.67 and AIC = 899.59. Several competing
-specifications are close in information criteria; Table~\ref{tab:aic_bic} reports
-the top candidates.
+\textbf{Stage 1 --- Auto-ARIMA (BIC):} The stepwise auto-ARIMA search over the constrained parameter grid ($p, q \le 2$; $P, Q \le 1$; $d=1$; $D=1$; $s=12$) identifies SARIMA$(1,1,0)\times(0,1,0)_{12}$ as the BIC-optimal specification on the 64-month training set, with BIC = 1279.22 and AIC = 1275.36. Several competing specifications are close in information criteria. Table~\ref{tab:aic_bic} reports the top candidates.
 
 \begin{table}[H]
 \centering
@@ -584,35 +338,20 @@ the top candidates.
 \toprule
 Model & AIC & BIC \\
 \midrule
-$(2,1,2)\times(1,1,1)_{12}$ & 899.59 & 910.67 \\
-$(3,1,1)\times(1,1,1)_{12}$ & 900.65 & 911.74 \\
-$(1,1,2)\times(0,1,1)_{12}$ & 911.43 & 919.35 \\
-$(2,1,1)\times(1,1,0)_{12}$ & 935.41 & 943.47 \\
-$(1,1,1)\times(0,1,1)_{12}$ & 936.61 & 943.06 \\
+$(1,1,0)\times(0,1,0)_{12}$ & 1275.36 & 1279.22 \\
+$(1,1,0)\times(1,1,0)_{12}$ & 1273.69 & 1279.49 \\
+$(0,1,1)\times(0,1,0)_{12}$ & 1275.70 & 1279.57 \\
+$(1,1,0)\times(0,1,1)_{12}$ & 1273.96 & 1279.76 \\
+$(0,1,1)\times(0,1,1)_{12}$ & 1274.08 & 1279.88 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\textbf{Stage 2 --- Nested Rolling CV:} The nested rolling cross-validation
-procedure, run over expanding folds with an initial window of at least 24
-observations, selects \textbf{SARIMA$(1,1,0)\times(1,1,0)_{12}$} as the model with
-the lowest mean RMSE across all folds ($\text{Mean RMSE}_{\text{CV}} \approx
-49{,}561$; $\text{Mean MAPE}_{\text{CV}} \approx 17.08\%$). This simpler
-specification appeared as the optimal choice in 6 out of the nested folds, indicating
-strong stability and adaptability as the training window expands over time.
+\textbf{Stage 2 --- Nested Rolling CV:} The nested rolling cross-validation procedure selects \textbf{SARIMA$(1,1,0)\times(1,1,0)_{12}$} as the model with the lowest mean RMSE across all folds ($\text{Mean RMSE}_{\text{CV}} \approx 49{,}561$; $\text{Mean MAPE}_{\text{CV}} \approx 12.15\%$). This simpler specification appeared as the optimal choice in 6 out of the nested folds, indicating strong stability and adaptability as the training window expands over time.
 
-The nested-CV result differs from the BIC-optimal auto-ARIMA model because BIC
-evaluates in-sample fit, while nested CV evaluates rolling out-of-sample
-performance. The fact that a simpler model wins on the out-of-sample criterion is
-consistent with the bias-variance tradeoff: the more heavily parameterized
-$(2,1,2)\times(1,1,1)$ specification overfits the training data, whereas the
-parsimonious $(1,1,0)\times(1,1,0)$ generalizes better to unseen horizons.
+The nested-CV result differs from the BIC-optimal auto-ARIMA model because BIC emphasizes parsimony and in-sample goodness-of-fit, whereas nested cross-validation evaluates rolling out-of-sample forecasting performance. Although the two specifications are structurally similar, the SARIMA$(1,1,0)\times(1,1,0)_{12}$ model captures seasonal autoregressive dependence more effectively than SARIMA$(1,1,0) × (0,1,0)_{12}$, leading to improved generalization and lower forecasting errors on unseen periods.
 
-The two estimated coefficients in the final model are both statistically significant:
-the non-seasonal AR term ($\text{ar.L1} = -0.322$, $p = 0.038$) captures a
-mean-reversion tendency at the one-month lag, and the seasonal AR term
-($\text{ar.S.L12} = -0.564$) reflects a negative dependency on same-month sales
-one year earlier, consistent with the market's year-over-year deceleration pattern
+The two estimated coefficients in the final model are both statistically significant: the non-seasonal AR term ($\text{ar.L1} = -0.322$, $p = 0.038$) captures a mean-reversion tendency at the one-month lag, and the seasonal AR term ($\text{ar.S.L12} = -0.564$) reflects a negative dependency on same-month sales one year earlier, consistent with the market's year-over-year deceleration pattern
 after 2022.
 
 \subsection{Residual Diagnostics}
@@ -623,26 +362,13 @@ Figure~\ref{fig:resid} presents four diagnostic panels for the selected model.
 \centering
 \includegraphics[width=0.92\textwidth]{figures/07_residual_diagnostics.png}
 \caption{Residual diagnostics for SARIMA$(1,1,0)\times(1,1,0)_{12}$:
-residuals over time (top left), histogram (top right), residual ACF (bottom left),
-and Q-Q plot (bottom right). Most autocorrelations lie within the 95\% confidence
-band, and the Ljung-Box $p$-value at lag 12 is 0.3355, confirming white-noise
-residuals.}
+residuals over time (top left), histogram (top right), residual ACF (bottom left), and Q-Q plot (bottom right). Most autocorrelations lie within the 95\% confidence band, and the Ljung-Box $p$-value at lag 12 is 0.3355, confirming white-noise residuals.}
 \label{fig:resid}
 \end{figure}
 
-The residuals fluctuate around zero with no obvious trend from 2018 through mid-2022.
-A cluster of large negative residuals appears in late 2022 to early 2023, reflecting
-the post-subsidy demand collapse that the univariate model cannot capture with
-lagged information alone. The histogram is approximately bell-shaped and symmetric
-around zero, with mild excess kurtosis in the left tail from the 2022--2023 shock.
-The residual ACF shows no significant spikes beyond lag 0, and the Q-Q plot aligns
-well with the theoretical normal line in the middle quantile range, with expected
-heavy-tail deviations at the extremes.
+The residuals fluctuate around zero with no obvious trend from 2018 through mid-2022. A cluster of large negative residuals appears in late 2022 to early 2023, reflecting the post-subsidy demand collapse that the univariate model cannot capture with lagged information alone. The histogram is approximately bell-shaped and symmetric around zero, with mild excess kurtosis in the left tail from the 2022--2023 shock. The residual ACF shows no significant spikes beyond lag 0, and the Q-Q plot aligns well with the theoretical normal line in the middle quantile range, with expected heavy-tail deviations at the extremes.
 
-The Ljung-Box $Q$-statistic at lag 12 yields $Q(12) = 14.91$ with a $p$-value of
-$0.3355 > 0.05$, confirming that the model residuals are not serially correlated.
-This satisfies the core adequacy condition for SARIMA and validates the model
-specification.
+The Ljung-Box $Q$-statistic at lag 12 yields $Q(12) = 13.47$ with a $p$-value of $0.3355 > 0.05$, confirming that the model residuals are not serially correlated. This satisfies the core adequacy condition for SARIMA and validates the model specification.
 
 \subsection{Test Set Forecast Performance}
 
@@ -656,45 +382,27 @@ Table~\ref{tab:test_metrics} reports forecast accuracy on the 12-month test wind
 \toprule
 Split & RMSE (units) & MAPE (\%) \\
 \midrule
-Training set & 55,014 & 28.56 \\
-Test set & 108,191 & 17.42 \\
-Nested CV (mean across folds) & 49,561 & 17.08 \\
+Training set & 54,923 & 28.60 \\
+Test set & 108,617 & 17.42 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Two features of these results merit discussion. First, the test MAPE (17.42\%) is
-lower than the training MAPE (28.56\%), an inverse of the usual pattern. This arises
-because the training set includes the early 2018--2020 period when absolute EV sales
-were very small---even modest absolute errors translate into large percentage errors
-at low base levels. The test window (2023--2024) involves much higher volumes, so
-the same absolute deviation represents a smaller percentage. Second, the test RMSE
-(108,191) is roughly double the training RMSE (55,014), which is a modest and
-acceptable train-to-test degradation for a highly volatile series. The most
-challenging period in the test window is January--February 2024, when actual sales
-fell sharply to around 290,000 units while the model predicted approximately 590,000,
-reflecting the joint effect of Lunar New Year and post-year-end subsidy adjustments
-that no univariate model could anticipate.
+Two features of these results merit discussion. First, the test MAPE (17.42\%) is lower than the training MAPE (28.60\%), an inverse of the usual pattern. This arises because the training set includes the early 2018--2020 period when absolute EV sales were very small -- even modest absolute errors translate into large percentage errors at low base levels. The test window (2023--2024) involves much higher volumes, so the same absolute deviation represents a smaller percentage. Second, the test RMSE (108,617) is roughly double the training RMSE (54,923), which is a modest and acceptable train-to-test degradation for a highly volatile series. The most challenging period in the test window is January--February 2024, when actual sales fell sharply to around 290,000 units while the model predicted approximately 590,000, reflecting the joint effect of Lunar New Year and post-year-end subsidy adjustments that no univariate model could anticipate.
 
 Figure~\ref{fig:test_forecast} plots the actual versus forecast values on the test set.
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.92\textwidth]{figures/08_test_forecast_nested_sarima.png}
-\caption{Test set forecast: SARIMA$(1,1,0)\times(1,1,0)_{12}$ (red) versus actual EV
-sales (blue), with 95\% confidence interval (shaded). The model tracks the seasonal
-pattern well from May 2023 to December 2023 but underestimates the sharp early-2024
-dip, which is attributable to the combined Lunar New Year and policy adjustment effect.}
+\caption{Test set forecast: SARIMA$(1,1,0)\times(1,1,0)_{12}$ (red) versus actual EV sales (blue), with 95\% confidence interval (shaded). The model tracks the seasonal pattern well from May 2023 to December 2023 but underestimates the sharp early-2024 dip, which is attributable to the combined Lunar New Year and policy adjustment effect.}
 \label{fig:test_forecast}
 \end{figure}
 
 \subsection{Robustness Check: Additive vs.\ Multiplicative Specification}
 \label{sec:robust}
 
-To test whether log-transforming the series (a common approach for variance
-stabilization) improves forecasting, we re-run the full nested-CV pipeline on
-$y^* = \log(1 + y_t)$ and back-transform the forecasts. Table~\ref{tab:log} reports
-the comparison.
+To test whether log-transforming the series (a common approach for variance stabilization) improves forecasting, we re-run the full nested-CV pipeline on $y^* = \log(1 + y_t)$ and back-transform the forecasts. Table~\ref{tab:log} reports the comparison.
 
 \begin{table}[H]
 \centering
@@ -704,27 +412,21 @@ the comparison.
 \toprule
 Specification & Test RMSE (units) & Test MAPE (\%) \\
 \midrule
-Additive --- no-log (Nested CV) & 108,191 & 17.42 \\
-Additive --- no-log (Auto-ARIMA) & 139,629 & 25.20 \\
-Multiplicative --- log-space (Auto-ARIMA) & 322,831 & 56.02 \\
-Multiplicative --- log-space (Nested CV) & 219,073 & 51.66 \\
+Additive --- no-log (Nested CV) & 108,617 & 17.42 \\
+Additive --- no-log (Auto-ARIMA) & 140,031 & 25.28 \\
+Additive --- log-space (Auto-ARIMA) & 146,423 & 27.14 \\
+Additive --- log-space (Nested CV) & 146,423 & 27.14 \\
+Multiplicative --- log-space (Nested CV) & 291,956 & 51.66 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The log-space specifications perform dramatically worse in out-of-sample terms
-(MAPE exceeding 50\%), despite appearing to fit the training data well. This
-``explosive forecasting effect'' arises because the log model learns the rapid
-growth phase of 2018--2022 and extrapolates it beyond the structural break of 2023.
-When back-transformed, even modest log-space errors compound into very large
-absolute unit errors. The result confirms that the additive SARIMA on the original
-series is the correct model family for this dataset, particularly given the
-post-subsidy structural change.
+The log-space specifications perform dramatically worse in out-of-sample terms (MAPE exceeding 50\%), despite appearing to fit the training data well. This ``explosive forecasting effect'' arises because the log model learns the rapid growth phase of 2018--2022 and extrapolates it beyond the structural break of 2023. When back-transformed, even modest log-space errors compound into very large
+absolute unit errors. The result confirms that the additive SARIMA on the original series is the correct model family for this dataset, particularly given the post-subsidy structural change.
 
 \subsection{Comparison with Baseline Models}
 
-Table~\ref{tab:baselines} compares the selected SARIMA model against all baselines
-on the same test set.
+Table~\ref{tab:baselines} compares the selected SARIMA model against all baselines on the same test set.
 
 \begin{table}[H]
 \centering
@@ -734,7 +436,7 @@ on the same test set.
 \toprule
 Model & Test RMSE (units) & Test MAPE (\%) \\
 \midrule
-SARIMA$(1,1,0)\times(1,1,0)_{12}$ (Nested CV) & 108,191 & \textbf{17.42} \\
+SARIMA$(1,1,0)\times(1,1,0)_{12}$ (Nested CV) & 108,617 & \textbf{17.42} \\
 Holt-Winters (ETS, additive) & \textbf{97,746} & 17.25 \\
 Prophet & 119,070 & 18.45 \\
 LSTM (lookback = 24) & 138,427 & 22.99 \\
@@ -743,22 +445,12 @@ ARIMA (non-seasonal) & 142,781 & 21.29 \\
 \end{tabular}
 \end{table}
 
-Holt-Winters achieves the lowest RMSE (97,746), slightly outperforming SARIMA on this
-metric. This is because Holt-Winters happens to track the sharp January--February 2024
-dip closely in this particular test window---the observations that dominate the squared
-error metric. SARIMA is virtually tied on MAPE (17.42\% vs.\ 17.25\%), and unlike
-Holt-Winters, its selection was validated across multiple time folds, not optimized
-for a single test split. Prophet performs comparably but slightly worse than both
-seasonal models (MAPE 18.45\%). The deep learning baseline (LSTM) underperforms all
-classical methods, confirming that 76 monthly observations are insufficient for a data-hungry
-architecture with 32 hidden units to learn the seasonal structure reliably. Non-seasonal
-ARIMA is the worst performer (MAPE 21.29\%), confirming the importance of seasonal
-components in this dataset.
+Holt-Winters achieves the lowest RMSE (97,746), slightly outperforming SARIMA on this metric. This is because Holt-Winters happens to track the sharp January--February 2024 dip closely in this particular test window---the observations that dominate the squared error metric. SARIMA is virtually tied on MAPE (17.42\% vs.\ 17.25\%), and unlike
+Holt-Winters, its selection was validated across multiple time folds, not optimized for a single test split. Prophet performs comparably but slightly worse than both seasonal models (MAPE 18.45\%). The deep learning baseline (LSTM) underperforms all classical methods, confirming that 76 monthly observations are insufficient for a data-hungry architecture with 32 hidden units to learn the seasonal structure reliably. Non-seasonal ARIMA is the worst performer (MAPE 21.29\%), confirming the importance of seasonal components in this dataset.
 
 \subsection{12-Month Forward Forecast}
 
-The model is refitted on all 76 observations and used to forecast May 2024 to April 2025.
-Table~\ref{tab:forecast} reports point forecasts and 95\% prediction intervals.
+The model is refitted on all 76 observations and used to forecast May 2024 to April 2025. Table~\ref{tab:forecast} reports point forecasts and 95\% prediction intervals.
 
 \begin{table}[H]
 \centering
@@ -787,26 +479,14 @@ Apr 2025 & 576,284 & 294,371 & 858,196 \\
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.92\textwidth]{figures/11_future_forecast.png}
-\caption{12-month forward forecast (green line) with 95\% confidence interval
-(shaded), plotted against the full historical series (blue). The forecast shows
-a seasonal peak near December 2024 and a trough in February 2025. The confidence
-interval widens as the horizon increases, reflecting cumulative forecast uncertainty.}
+\caption{12-month forward forecast (green line) with 95\% confidence interval (shaded), plotted against the full historical series (blue). The forecast shows a seasonal peak near December 2024 and a trough in February 2025. The confidence interval widens as the horizon increases, reflecting cumulative forecast uncertainty.}
 \label{fig:future_forecast}
 \end{figure}
 
-The forecast pattern is economically coherent and consistent with known Chinese EV
-market dynamics. Sales rise steadily from May through December 2024, peaking at
-approximately 804,000 units in December---driven by year-end promotional campaigns,
-fleet purchase cycles, and the annual concentration of government-linked
-institutional buying. A sharp seasonal correction is predicted in January--February
-2025, with sales bottoming at roughly 446,000 units in February, as the Lunar New
-Year holiday disrupts both production and retail. A recovery to the mid-600,000
-range is forecast for March--April 2025 as market activity normalizes.
+The forecast pattern is economically coherent and consistent with known Chinese EV market dynamics. Sales rise steadily from May through December 2024, peaking at approximately 804,000 units in December---driven by year-end promotional campaigns, fleet purchase cycles, and the annual concentration of government-linked institutional buying. A sharp seasonal correction is predicted in January--February 2025, with sales bottoming at roughly 446,000 units in February, as the Lunar New
+Year holiday disrupts both production and retail. A recovery to the mid-600,000 range is forecast for March--April 2025 as market activity normalizes.
 
-The 95\% confidence interval for December 2024 spans from 560,341 to 1,048,485
-units, reflecting substantial but not unreasonable uncertainty at a 7-month horizon
-in a rapidly evolving market. The widening interval over the forecast horizon is
-consistent with theoretical expectations for ARIMA-family models \citep{chen2025,
+The 95\% confidence interval for December 2024 spans from 560,341 to 1,048,485 units, reflecting substantial but not unreasonable uncertainty at a 7-month horizon in a rapidly evolving market. The widening interval over the forecast horizon is consistent with theoretical expectations for ARIMA-family models \citep{chen2025,
 cetin2024}.
 
 %% ─────────────────────────────────────────────────────────────────────────────
@@ -816,137 +496,56 @@ cetin2024}.
 
 \subsection{Economic Interpretation}
 
-The SARIMA forecast captures two economically important features of China's EV
-market that are consistent with the existing literature. First, the overall upward
-trend---though muted relative to 2021--2022---reflects the continued baseline growth
-in consumer EV adoption as vehicle prices decline, model variety increases, and
-charging infrastructure expands. The China NEV penetration rate has risen from below
-5\% to over 30\% of new passenger vehicle sales between 2020 and 2024, and
-continuing structural demand supports a growth trajectory even in a post-subsidy
-environment.
+The SARIMA forecast captures two economically important features of China's EV market that are consistent with the existing literature. First, the overall upward trend---though muted relative to 2021--2022---reflects the continued baseline growth in consumer EV adoption as vehicle prices decline, model variety increases, and charging infrastructure expands. The China NEV penetration rate has risen from below 5\% to over 30\% of new passenger vehicle sales between 2020 and 2024, and continuing structural demand supports a growth trajectory even in a post-subsidy environment.
 
-Second, the pronounced within-year seasonal cycle---with a Q4 peak and Q1 trough---is
-a robust feature documented in both \citet{chen2025} and in the raw historical data.
-The December peak specifically reflects a cluster of market-specific drivers: (a)
-year-end purchase incentives offered by dealers and local governments, (b) completion
-of annual fleet procurement by corporate and institutional buyers, and (c) consumer
-behavior driven by annual bonus income concentration in Q4. The February trough reflects
-the near-complete suspension of automotive retail activity during the Lunar New Year
-holiday period, which typically encompasses 10--15 calendar days but affects consumer
+Second, the pronounced within-year seasonal cycle---with a Q4 peak and Q1 trough---is a robust feature documented in both \citet{chen2025} and in the raw historical data. The December peak specifically reflects a cluster of market-specific drivers: (a) year-end purchase incentives offered by dealers and local governments, (b) completion
+of annual fleet procurement by corporate and institutional buyers, and (c) consumer behavior driven by annual bonus income concentration in Q4. The February trough reflects the near-complete suspension of automotive retail activity during the Lunar New Year holiday period, which typically encompasses 10--15 calendar days but affects consumer
 activity for a broader 4--6 week window \citep{chen2025}.
 
-These structural drivers are stable enough that a univariate seasonal model can
-represent them reliably under normal market conditions. However, the model's failure
-in January--February 2024---where actual sales collapsed further than the model
-anticipated---illustrates the key limitation of univariate time series: it cannot
-incorporate information about changes in government policy that shift the demand
+These structural drivers are stable enough that a univariate seasonal model can represent them reliably under normal market conditions. However, the model's failure in January--February 2024---where actual sales collapsed further than the model anticipated---illustrates the key limitation of univariate time series: it cannot incorporate information about changes in government policy that shift the demand
 baseline in a non-seasonal way.
 
 \subsection{Practical Implications}
 
-The forecast results have several actionable implications for industry participants
-and policymakers.
+The forecast results have several actionable implications for industry participants and policymakers.
 
-\textbf{Production and inventory planning:} The December 2024 peak forecast of
-approximately 804,000 units implies that manufacturers and their suppliers should
-begin building finished-vehicle and battery inventory in September--October 2024 at
-the latest to meet fourth-quarter demand. Conversely, the February 2025 trough
-forecast provides a signal to reduce production rates and inventory builds in
-January, avoiding stranded working capital during the low-demand Lunar New Year
-period. The 95\% confidence intervals support scenario-based planning: a ``high
-scenario'' based on the upper bound (1,048,485 units in December) can inform
-maximum capacity utilization decisions, while the lower bound (560,341 units) can
-serve as a conservative base case for financial planning.
+\textbf{Production and inventory planning:} The December 2024 peak forecast of approximately 804,000 units implies that manufacturers and their suppliers should begin building finished-vehicle and battery inventory in September--October 2024 at the latest to meet fourth-quarter demand. Conversely, the February 2025 trough forecast provides a signal to reduce production rates and inventory builds in January, avoiding stranded working capital during the low-demand Lunar New Year
+period. The 95\% confidence intervals support scenario-based planning: a ``high scenario'' based on the upper bound (1,048,485 units in December) can inform maximum capacity utilization decisions, while the lower bound (560,341 units) can serve as a conservative base case for financial planning.
 
-\textbf{Charging infrastructure deployment:} The seasonally-adjusted forecast directly
-informs the timing of public charging network expansion. Months forecasted above
-700,000 units (August--December 2024) will generate substantially higher daily
-charging demand, particularly in urban and highway corridor settings. Infrastructure
-planners can use these projections to prioritize grid upgrade investments ahead of
-high-demand periods, as highlighted by \citet{chen2025} in the context of China's
-NEV infrastructure policy.
+\textbf{Charging infrastructure deployment:} The seasonally-adjusted forecast directly informs the timing of public charging network expansion. Months forecasted above 700,000 units (August--December 2024) will generate substantially higher daily charging demand, particularly in urban and highway corridor settings. Infrastructure
+planners can use these projections to prioritize grid upgrade investments ahead of high-demand periods, as highlighted by \citet{chen2025} in the context of China's NEV infrastructure policy.
 
-\textbf{Supply chain coordination:} Battery cell procurement---typically negotiated
-3--6 months in advance---requires accurate rolling forecasts aligned with the
-seasonal demand cycle. The model's forecast table enables procurement planners to
-align lithium carbonate and cathode material orders with the mid-year (Jun--Aug)
-and year-end (Nov--Dec) demand surges, reducing both shortage risk and excess
-inventory cost.
+\textbf{Supply chain coordination:} Battery cell procurement---typically negotiated 3--6 months in advance---requires accurate rolling forecasts aligned with the seasonal demand cycle. The model's forecast table enables procurement planners to align lithium carbonate and cathode material orders with the mid-year (Jun--Aug) and year-end (Nov--Dec) demand surges, reducing both shortage risk and excess inventory cost.
 
 \subsection{Why SARIMA is the Preferred Model}
 
-Despite Holt-Winters achieving marginally lower RMSE on this particular test window,
-SARIMA is the preferred model for three reasons. First, SARIMA's selection via nested
-rolling CV provides a more robust validation than a single-split evaluation, making
-it less sensitive to the specific characteristics of one 12-month hold-out period.
-Second, SARIMA's parameters (AR, I, MA terms with seasonal analogs) have direct
-economic interpretability: the negative non-seasonal AR coefficient reflects
-short-term mean reversion in monthly sales, and the negative seasonal AR coefficient
-reflects the year-over-year market stabilization since 2022. Holt-Winters' smoothing
-parameters lack this structural interpretation. Third, SARIMA's explicit probabilistic
-framework naturally provides confidence intervals that quantify forecast uncertainty
-in a theoretically principled way, supporting the scenario-based planning described
+Despite Holt-Winters achieving marginally lower RMSE on this particular test window, SARIMA is the preferred model for three reasons. First, SARIMA's selection via nested rolling CV provides a more robust validation than a single-split evaluation, making it less sensitive to the specific characteristics of one 12-month hold-out period. Second, SARIMA's parameters (AR, I, MA terms with seasonal analogs) have direct economic interpretability: the negative non-seasonal AR coefficient reflects short-term mean reversion in monthly sales, and the negative seasonal AR coefficient reflects the year-over-year market stabilization since 2022. Holt-Winters' smoothing parameters lack this structural interpretation. Third, SARIMA's explicit probabilistic framework naturally provides confidence intervals that quantify forecast uncertainty in a theoretically principled way, supporting the scenario-based planning described
 above.
 
 \subsection{Limitations}
 
 This paper's results should be interpreted with three important caveats.
 
-\textbf{Univariate model limitation:} SARIMA relies entirely on lagged values of the
-target series. It cannot anticipate policy discontinuities (subsidy changes, purchase
-restrictions), macroeconomic shocks (income growth, fuel price changes, exchange rate
-movements), or competitive dynamics (new model launches, price wars). The January 2023
-post-subsidy collapse and the early 2024 underperformance both demonstrate this
-fundamental limitation.
+\textbf{Univariate model limitation:} SARIMA relies entirely on lagged values of the target series. It cannot anticipate policy discontinuities (subsidy changes, purchase restrictions), macroeconomic shocks (income growth, fuel price changes, exchange rate
+movements), or competitive dynamics (new model launches, price wars). The January 2023 post-subsidy collapse and the early 2024 underperformance both demonstrate this fundamental limitation.
 
-\textbf{Short sample and structural breaks:} With only 76 monthly observations spanning
-two qualitatively different market regimes (pre- and post-subsidy phase-out), the model
-must simultaneously learn both the high-growth pattern of 2018--2022 and the more stable
-pattern of 2023--2024. This dual-regime estimation may reduce the model's ability to
-capture either regime cleanly, and SARIMA's assumption of stable seasonality over time
-may not hold across the full sample period.
+\textbf{Short sample and structural breaks:} With only 76 monthly observations spanning two qualitatively different market regimes (pre- and post-subsidy phase-out), the model must simultaneously learn both the high-growth pattern of 2018--2022 and the more stable pattern of 2023--2024. This dual-regime estimation may reduce the model's ability to capture either regime cleanly, and SARIMA's assumption of stable seasonality over time may not hold across the full sample period.
 
-\textbf{Aggregation:} The analysis focuses on total EV sales without disaggregation
-by vehicle segment (BEV vs.\ PHEV), price tier, or brand. BEVs and PHEVs have
-distinct seasonal patterns and different sensitivities to policy changes; aggregate
-forecasting blends these dynamics and may mask important sub-market trends.
+\textbf{Aggregation:} The analysis focuses on total EV sales without disaggregation by vehicle segment (BEV vs.\ PHEV), price tier, or brand. BEVs and PHEVs have distinct seasonal patterns and different sensitivities to policy changes; aggregate forecasting blends these dynamics and may mask important sub-market trends.
 
 %% ─────────────────────────────────────────────────────────────────────────────
 \section{Conclusion}
 \label{sec:conclusion}
 %% ─────────────────────────────────────────────────────────────────────────────
 
-This paper applies a fully documented SARIMA framework to forecast monthly EV sales
-in China from a 76-month historical series spanning January 2018 to April 2024.
-The primary methodological contribution is a two-stage model selection procedure
-that combines BIC-guided auto-ARIMA with nested rolling cross-validation, producing
-a final specification of SARIMA$(1,1,0)\times(1,1,0)_{12}$ that is more parsimonious
-and more robust than the BIC-optimal in-sample model.
+This paper applies a fully documented SARIMA framework to forecast monthly EV sales in China from a 76-month historical series spanning January 2018 to April 2024. The primary methodological contribution is a two-stage model selection procedure that combines BIC-guided auto-ARIMA with nested rolling cross-validation, producing a final specification of SARIMA$(1,1,0)\times(1,1,0)_{12}$ that is more parsimonious and more robust than the BIC-optimal in-sample model.
 
-The key empirical findings are: (1) the China EV sales series is strongly
-non-stationary in levels but achieves confirmed stationarity after one non-seasonal
-and one seasonal difference, as validated by both ADF and KPSS tests; (2) the
-selected SARIMA model achieves test-set MAPE of 17.42\% and passes the Ljung-Box
-residual independence test at lag 12 ($p = 0.336$); (3) an additive specification
-on the original series significantly outperforms a multiplicative log-space
-alternative, due to the structural market shift in 2023; (4) the 12-month forward
-forecast predicts a December 2024 peak of approximately 804,000 units and a
-February 2025 trough of approximately 446,000 units, consistent with established
-seasonal patterns in China's NEV market.
+The key empirical findings are: (1) the China EV sales series is strongly non-stationary in levels but achieves confirmed stationarity after one non-seasonal and one seasonal difference, as validated by both ADF and KPSS tests; (2) the selected SARIMA model achieves test-set MAPE of 17.42\% and passes the Ljung-Box residual independence test at lag 12 ($p = 0.336$); (3) an additive specification on the original series significantly outperforms a multiplicative log-space
+alternative, due to the structural market shift in 2023; (4) the 12-month forward forecast predicts a December 2024 peak of approximately 804,000 units and a February 2025 trough of approximately 446,000 units, consistent with established seasonal patterns in China's NEV market.
 
-These forecasts have practical relevance for manufacturers, distributors,
-policymakers, and infrastructure planners. The December peak projection supports
-proactive Q3--Q4 inventory and production builds, while the February trough informs
-planned production slowdowns and seasonal cash flow management. The 95\% confidence
-intervals facilitate low/high scenario planning across stakeholder groups.
+These forecasts have practical relevance for manufacturers, distributors, policymakers, and infrastructure planners. The December peak projection supports proactive Q3--Q4 inventory and production builds, while the February trough informs planned production slowdowns and seasonal cash flow management. The 95\% confidence intervals facilitate low/high scenario planning across stakeholder groups.
 
-Future work should extend this framework in three directions. First, incorporating
-exogenous policy variables---such as subsidy amounts, purchase restriction policies,
-and credit availability---via SARIMAX would reduce the model's vulnerability to
-policy shocks. Second, disaggregating the forecast by BEV versus PHEV segment, or
-by major OEM, would provide more actionable granularity for industry decision-makers.
-Third, the model should be updated on a rolling basis as new monthly observations
-become available, with automated anomaly detection to flag structural breaks early.
+Future work should extend this framework in three directions. First, incorporating exogenous policy variables---such as subsidy amounts, purchase restriction policies, and credit availability---via SARIMAX would reduce the model's vulnerability to policy shocks. Second, disaggregating the forecast by BEV versus PHEV segment, or by major OEM, would provide more actionable granularity for industry decision-makers. Third, the model should be updated on a rolling basis as new monthly observations become available, with automated anomaly detection to flag structural breaks early.
 
 %% ─────────────────────────────────────────────────────────────────────────────
 %% APPENDICES
@@ -956,135 +555,50 @@ become available, with automated anomaly detection to flag structural breaks ear
 \section{Implementation Details}
 \label{app:code}
 
-The entire pipeline was implemented in Python 3.11 using the following libraries:
-\texttt{pandas} for data loading and monthly aggregation; \texttt{numpy} for
-numerical operations; \texttt{matplotlib} and \texttt{seaborn} for visualization;
-\texttt{statsmodels} for SARIMAX estimation, ADF, KPSS, and Ljung-Box testing;
-\texttt{pmdarima} for auto-ARIMA and rolling cross-validation;
-\texttt{prophet} for the Facebook Prophet baseline; and \texttt{tensorflow/keras}
-for the LSTM baseline. The code is organized into two notebooks:
-\texttt{01\_Data\_Prep\_and\_EDA.ipynb} (preprocessing, decomposition, outlier
-analysis) and \texttt{02\_Time\_Series\_Modeling.ipynb} (stationarity tests, model
-selection, diagnostics, forecast comparison). All random seeds are fixed at 42
-for reproducibility.
+The entire pipeline was implemented in Python 3.11 using the following libraries: \texttt{pandas} for data loading and monthly aggregation; \texttt{numpy} for numerical operations; \texttt{matplotlib} and \texttt{seaborn} for visualization; \texttt{statsmodels} for SARIMAX estimation, ADF, KPSS, and Ljung-Box testing; \texttt{pmdarima} for auto-ARIMA and rolling cross-validation; \texttt{prophet} for the Facebook Prophet baseline; and \texttt{tensorflow/keras} for the LSTM baseline. The code is organized into two notebooks: \texttt{01\_Data\_Prep\_and\_EDA.ipynb} (preprocessing, decomposition, outlier analysis) and \texttt{02\_Time\_Series\_Modeling.ipynb} (stationarity tests, model selection, diagnostics, forecast comparison). All random seeds are fixed at 42 for reproducibility.
 
 \section{SARIMA Algorithm Outline}
 \label{app:algorithm}
 
 \noindent\textbf{Input:} Monthly EV sales series $\{y_t\}_{t=1}^{T}$, seasonal period $m=12$.
 
-\noindent\textbf{Step 1 --- Data Preprocessing:} Remove duplicates; convert
-\texttt{units\_sold} to integer; filter EV records; aggregate to monthly start
-frequency; fill missing months with zero.
+\noindent\textbf{Step 1 --- Data Preprocessing:} Remove duplicates; convert \texttt{units\_sold} to integer; filter EV records; aggregate to monthly start frequency; fill missing months with zero.
 
-\noindent\textbf{Step 2 --- Exploratory Analysis:} Plot raw series, compute summary
-statistics, perform additive decomposition to inspect trend, seasonal, and residual
-components. Apply 3-sigma outlier check on residuals.
+\noindent\textbf{Step 2 --- Exploratory Analysis:} Plot raw series, compute summary statistics, perform additive decomposition to inspect trend, seasonal, and residual components. Apply 3-sigma outlier check on residuals.
 
-\noindent\textbf{Step 3 --- Stationarity:} Run ADF and KPSS on raw series and
-differenced variants. Select $(d,D)=(1,1)$ based on dual test confirmation.
+\noindent\textbf{Step 3 --- Stationarity:} Run ADF and KPSS on raw series and differenced variants. Select $(d,D)=(1,1)$ based on dual test confirmation.
 
-\noindent\textbf{Step 4 --- Initial Model Search (Stage 1):} Run auto-ARIMA with
-$p,q \le 2$, $P,Q \le 1$, $d=1$, $D=1$, $s=12$, BIC criterion, stepwise search.
-Record top-3 candidates by BIC.
+\noindent\textbf{Step 4 --- Initial Model Search (Stage 1):} Run auto-ARIMA with $p,q \le 2$, $P,Q \le 1$, $d=1$, $D=1$, $s=12$, BIC criterion, stepwise search. Record top-3 candidates by BIC.
 
-\noindent\textbf{Step 5 --- Nested Rolling CV (Stage 2):} For each fold in a
-rolling expanding window, re-fit auto-ARIMA and record one-step-ahead RMSE. Aggregate
-mean RMSE across folds per order configuration. Select the order with lowest mean RMSE.
+\noindent\textbf{Step 5 --- Nested Rolling CV (Stage 2):} For each fold in a rolling expanding window, re-fit auto-ARIMA and record one-step-ahead RMSE. Aggregate mean RMSE across folds per order configuration. Select the order with lowest mean RMSE.
 
-\noindent\textbf{Step 6 --- Residual Diagnostics:} Inspect residual ACF, histogram,
-Q-Q plot, and Ljung-Box $Q(12)$ statistic.
+\noindent\textbf{Step 6 --- Residual Diagnostics:} Inspect residual ACF, histogram, Q-Q plot, and Ljung-Box $Q(12)$ statistic.
 
-\noindent\textbf{Step 7 --- Baseline Comparison:} Fit ARIMA, Holt-Winters, Prophet,
-and LSTM on the same training split. Evaluate all models on the 12-month test set.
+\noindent\textbf{Step 7 --- Baseline Comparison:} Fit ARIMA, Holt-Winters, Prophet, and LSTM on the same training split. Evaluate all models on the 12-month test set.
 
-\noindent\textbf{Step 8 --- Final Forecast:} Refit selected SARIMA on all $T$
-observations. Generate $h=12$ step-ahead forecasts with 95\% confidence intervals.
+\noindent\textbf{Step 8 --- Final Forecast:} Refit selected SARIMA on all $T$ observations. Generate $h=12$ step-ahead forecasts with 95\% confidence intervals.
 
-\noindent\textbf{Output:} SARIMA parameter estimates, test-set RMSE/MAPE, residual
-test $p$-values, and the 12-month forecast table.
-
-\section{Interpretation of SARIMA Parameters}
-\label{app:parameters}
-
-For the selected model SARIMA$(1,1,0)\times(1,1,0)_{12}$:
-\begin{itemize}
-\item $p=1$: One non-seasonal autoregressive term, capturing the mean-reverting
-dependency of current monthly sales on the previous month's sales.
-\item $d=1$: One non-seasonal differencing, removing the stochastic trend.
-\item $q=0$: No non-seasonal moving average term is needed once AR and differencing
-are included.
-\item $P=1$: One seasonal autoregressive term at lag 12, capturing the year-over-year
-dependency between same-month sales in consecutive years.
-\item $D=1$: One seasonal differencing, removing the stochastic seasonal component.
-\item $Q=0$: No seasonal moving average term is needed.
-\item $s=12$: Annual seasonal period (monthly data).
-\end{itemize}
-
-The model is more parsimonious than the BIC-optimal auto-ARIMA selection
-$(2,1,2)\times(1,1,1)_{12}$, with only 2 estimated parameters rather than 6, which
-is appropriate for a training set of 64 observations. The negative sign of both AR
-coefficients ($\phi_1 = -0.322$ and $\Phi_1 = -0.564$) implies mean reversion at
-both the monthly and annual frequencies, consistent with a market that fluctuates
-around a growing trend rather than exhibiting momentum-driven boom-bust cycles.
-
-\section{Full Forecast Table}
-\label{app:forecast_table}
-
-\begin{longtable}{lrrr}
-\caption{12-month forward forecast (May 2024 to April 2025) with 95\%
-prediction intervals}
-\label{tab:full_forecast} \\
-\toprule
-Month & Forecast (units) & Lower 95\% (units) & Upper 95\% (units) \\
-\midrule
-\endfirsthead
-\toprule
-Month & Forecast (units) & Lower 95\% (units) & Upper 95\% (units) \\
-\midrule
-\endhead
-\bottomrule
-\endfoot
-May 2024 & 536,581 & 397,903 & 675,259 \\
-Jun 2024 & 637,615 & 473,204 & 802,026 \\
-Jul 2024 & 612,811 & 429,239 & 796,382 \\
-Aug 2024 & 677,390 & 479,336 & 875,444 \\
-Sep 2024 & 697,665 & 486,770 & 908,559 \\
-Oct 2024 & 699,527 & 476,915 & 922,140 \\
-Nov 2024 & 753,361 & 519,740 & 986,981 \\
-Dec 2024 & 804,413 & 560,341 & 1,048,485 \\
-Jan 2025 & 522,333 & 268,262 & 776,405 \\
-Feb 2025 & 446,472 & 191,170 & 718,534 \\
-Mar 2025 & 624,180 & 351,229 & 897,130 \\
-Apr 2025 & 576,284 & 294,371 & 858,196 \\
-\end{longtable}
+\noindent\textbf{Output:} SARIMA parameter estimates, test-set RMSE/MAPE, residual test $p$-values, and the 12-month forecast table.
 
 %% ─────────────────────────────────────────────────────────────────────────────
 %% REFERENCES
 %% ─────────────────────────────────────────────────────────────────────────────
 \newpage
-\section*{References}
-\addcontentsline{toc}{section}{References}
 
-\begin{description}
+\begin{thebibliography}{99}
 \setlength\itemsep{0.4em}
 
-\item \textbf{Chen, J., Huang, Y., Jin, H. and Chen, X.} (2025) `Research on the
-forecasting of sales volume of new energy vehicles based on SARIMA model',
+\bibitem[Chen et al.(2025)]{chen2025} 
+\textbf{Chen, J., Huang, Y., Jin, H. and Chen, X.} (2025) `Research on the forecasting of sales volume of new energy vehicles based on SARIMA model',
 \textit{Journal of Education, Humanities and Social Sciences}, 55, pp.~76--82.
 
-\item \textbf{\c{C}etin, B. and Ta\c{s}demir, \c{C}.} (2024) `Forecasting electric
-vehicle sales using optimized SARIMA model: A two-year predictive analysis',
+\bibitem[Çetin and Taşdemir(2024)]{cetin2024} 
+\textbf{\c{C}etin, B. and Ta\c{s}demir, \c{C}.} (2024) `Forecasting electric vehicle sales using optimized SARIMA model: A two-year predictive analysis',
 \textit{Veri Bilimi Dergisi}, 7(2), pp.~41--51.
 
-\item \textbf{Felixzhao} (2024) \textit{China Automobile Monthly Sales Data (2018--2024.4)}.
-Available at: \url{https://www.kaggle.com/datasets/felixzhao/china-automobile-monthly-sales-data-2018-2024-4}
-(Accessed: May 2026).
+\bibitem[Felixzhao(2024)]{felixzhao2024} 
+\textbf{Felixzhao} (2024) \textit{China Automobile Monthly Sales Data (2018--2024.4)}. Available at: \url{https://www.kaggle.com/datasets/felixzhao/china-automobile-monthly-sales-data-2018-2024-4} (Accessed: May 2026).
 
-\item \textbf{Neugeboren, R. and Jacobson, M.} (2014) \textit{Writing Economics: A Guide
-for Harvard Economics Concentrators}. Harvard Writing Project. Minor revisions
-October 2014.
-
-\end{description}
+\end{thebibliography}
 
 \end{document}
