@@ -847,6 +847,76 @@ def main() -> None:
 
     print(log_compare)
 
+    # Additive vs multiplicative exponential smoothing
+    def compute_metrics_hw(actual: pd.Series, pred: pd.Series) -> tuple[float, float]:
+        rmse = float(np.sqrt(mean_squared_error(actual, pred)))
+        mape = float(np.mean(np.abs((actual - pred) / actual.replace(0, np.nan))) * 100)
+        return rmse, mape
+
+    if (monthly["EV_Sales"] <= 0).any():
+        raise ValueError(
+            "Multiplicative Holt-Winters requires strictly positive values, but EV_Sales contains zero or negative values."
+        )
+
+    train_hw = train.astype(float)
+    test_hw = test.astype(float)
+
+    hw_add = ExponentialSmoothing(
+        train_hw,
+        trend="add",
+        seasonal="add",
+        seasonal_periods=12,
+    ).fit(optimized=True)
+
+    pred_add = pd.Series(hw_add.forecast(len(test_hw)), index=test_hw.index)
+    rmse_add, mape_add = compute_metrics_hw(test_hw, pred_add)
+
+    hw_mul = ExponentialSmoothing(
+        train_hw,
+        trend="add",
+        seasonal="mul",
+        seasonal_periods=12,
+    ).fit(optimized=True)
+
+    pred_mul = pd.Series(hw_mul.forecast(len(test_hw)), index=test_hw.index)
+    rmse_mul, mape_mul = compute_metrics_hw(test_hw, pred_mul)
+
+    comparison_hw = pd.DataFrame(
+        [
+            {
+                "seasonality": "additive",
+                "rmse": rmse_add,
+                "mape": mape_add,
+                "model": "ETS(add,add)",
+            },
+            {
+                "seasonality": "multiplicative",
+                "rmse": rmse_mul,
+                "mape": mape_mul,
+                "model": "ETS(add,mul)",
+            },
+        ]
+    ).sort_values(["rmse", "mape"]).reset_index(drop=True)
+
+    fig, ax = plt.subplots(figsize=(10, 4))
+    ax.plot(train_hw.index, train_hw, label="Train", color="#1f77b4", linewidth=2.0)
+    ax.plot(test_hw.index, test_hw, label="Actual (Test)", color="#111111", linewidth=2.5)
+    ax.plot(pred_add.index, pred_add, label="ETS additive", color="#E63946", linewidth=2.0)
+    ax.plot(pred_mul.index, pred_mul, label="ETS multiplicative", color="#2A9D8F", linewidth=2.0)
+
+    from matplotlib.ticker import StrMethodFormatter
+
+    ax.set_title("Test Set Forecast - Additive vs Multiplicative ETS", fontsize=13)
+    ax.set_ylabel("Units Sold")
+    ax.set_xlabel("Month")
+    ax.yaxis.set_major_formatter(StrMethodFormatter("{x:,.0f}"))
+    ax.legend(loc="upper left")
+
+    plt.tight_layout()
+    plt.show()
+
+    print(comparison_hw)
+
     # Baselines
     baseline_results: list[dict[str, object]] = []
 

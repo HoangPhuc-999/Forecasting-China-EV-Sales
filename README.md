@@ -31,11 +31,11 @@ This project constructs a rigorous SARIMA forecasting workflow applied to a 76-m
 
 | Metric | Value |
 |---|---|
-| **Final model** | SARIMA$(1,1,0)\times(1,1,0)_{12}$ |
+| **Final model** | $\text{SARIMA}(1,1,0) \times (1,1,0)_{12}$ |
 | **Test MAPE** | 17.42 % |
 | **Test RMSE** | 108,617 units |
 | **Ljung-Box** $Q(12)$ $p$-value | 0.336 (white-noise residuals ✓) |
-| **Dec 2024 peak forecast** | ~804,000 units |
+| **Dec 2024 peak forecast** | ~810,000 units |
 | **Feb 2025 trough forecast** | ~446,000 units |
 
 - The model **outperforms non-seasonal ARIMA and LSTM** and is **competitive with Holt-Winters** across both RMSE and MAPE.
@@ -129,14 +129,16 @@ Forecasting-China-EV-Sales/
 | LSTM (lookback = 24) | 138,427 | 22.99 |
 | ARIMA (non-seasonal) | 142,781 | 21.29 |
 
-### Additive vs. Multiplicative (Robustness Check)
+### Additive vs. Multiplicative and Log vs. No-log (Robustness Check)
 
 | Specification | Test RMSE | Test MAPE (%) |
 |---|---|---|
-| Additive, no-log — Nested CV | 108,617 | **17.42** |
-| Additive, no-log — Auto-ARIMA | 140,031 | 25.28 |
-| Additive, log-space — Nested CV | 146,423 | 27.14 |
-| Multiplicative, log-space — Nested CV | 291,956 | 51.66 |
+| SARIMA — no-log (Nested CV)  | 108,617 | **17.42** |
+| SARIMA — no-log (Auto-ARIMA) | 140,031 | 25.28 |
+| SARIMA — log-space (Auto-ARIMA) | 146,423 | 27.14 |
+| SARIMA — log-space (Nested CV) | 146,423 | 27.14 |
+| ETS — Additive | 97,746 | 17.25 |
+| ETS — Multiplicative | 147,854 | 26.57 |
 
 > The log-space model learns the pre-2023 high-growth trajectory and over-extrapolates beyond the structural break, compounding errors upon back-transformation.
 
@@ -146,18 +148,18 @@ Forecasting-China-EV-Sales/
 
 | Month | Forecast | Lower 95% | Upper 95% |
 |---|---|---|---|
-| May 2024 | 536,581 | 397,903 | 675,259 |
-| Jun 2024 | 637,615 | 473,204 | 802,026 |
-| Jul 2024 | 612,811 | 429,239 | 796,382 |
-| Aug 2024 | 677,390 | 479,336 | 875,444 |
-| Sep 2024 | 697,665 | 486,770 | 908,559 |
-| Oct 2024 | 699,527 | 476,915 | 922,140 |
-| Nov 2024 | 753,361 | 519,740 | 986,981 |
-| **Dec 2024** | **804,413** | 560,341 | 1,048,485 |
-| Jan 2025 | 522,333 | 268,262 | 776,405 |
-| **Feb 2025** | **446,472** | 191,170 | 718,534 |
-| Mar 2025 | 624,180 | 351,229 | 897,130 |
-| Apr 2025 | 576,284 | 294,371 | 858,196 |
+| May 2024 | 535,606 | 401,629 | 669,584 |
+| Jun 2024 | 646,477 | 483,176 | 809,778 |
+| Jul 2024 | 620,896 | 426,384 | 815,407 |
+| Aug 2024 | 687,121 | 467,514 | 906,729 |
+| Sep 2024 | 706,742 | 464,147 | 949,336 |
+| Oct 2024 | 707,084 | 443,633 | 970,534 |
+| Nov 2024 | 761,747 | 478,936 | 1,044,557 |
+| **Dec 2024** | **810,054** | 509,137 | 1,110,970 |
+| Jan 2025 | 503,186 | 185,190 | 821,182 |
+| **Feb 2025** | **446,472** | 112,268 | 780,675 |
+| Mar 2025 | 614,824 | 265,163 | 964,485 |
+| Apr 2025 | 576,971 | 212,508 | 941,434 |
 
 The December 2024 peak reflects year-end promotions and fleet procurement; the February 2025 trough reflects the Lunar New Year retail suspension.
 
@@ -175,7 +177,7 @@ The December 2024 peak reflects year-end promotions and fleet procurement; the F
 | `06_acf_pacf_diff.png` | ACF/PACF after $(d=1, D=1, s=12)$ differencing |
 | `07_residual_diagnostics.png` | SARIMA residual diagnostics: time plot, histogram, ACF, Q-Q |
 | `08_test_forecast_nested_sarima.png` | Test set forecast vs. actuals with 95% CI |
-| `09_test_forecast_log-space_nested_sarima.png` | Log-space test forecast (robustness check) |
+| `09_test_forecast_additiive_vs_multiplicative_ets.png` | Test set accuracy comparison between SARIMA and ETS models (robustness check) |
 | `10_forecast_comparison.png` | All baseline model forecasts overlaid on test actuals |
 | `11_future_forecast.png` | 12-month forward forecast with 95% confidence bands |
 
@@ -264,4 +266,3 @@ All random seeds are fixed at `42` for reproducibility.
 ## Author
 
 **Ngo Hoang Phuc** — National Economics University
-`11230582@st.neu.edu.vn`
