@@ -395,7 +395,7 @@ Figure~\ref{fig:test_forecast} plots the actual versus forecast values on the te
 \label{fig:test_forecast}
 \end{figure}
 
-\subsection{Robustness Check: Additive vs.\ Multiplicative and Log vs.\ No-log Specification}
+\subsection{Robustness Check: Additive vs.\ Multiplicative and Log vs.\ No-log Specifications}
 \label{sec:robust}
 
 To test whether log-transforming the series (a common approach for variance stabilization) improves forecasting, we re-run the full nested-CV pipeline on $y^* = \log(1 + y_t)$ and back-transform the forecasts. Table~\ref{tab:log} reports the comparison.
